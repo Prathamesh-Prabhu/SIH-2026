@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
+import 'ml_service.dart';
 import 'supabase_service.dart';
 
 class DbService extends ChangeNotifier {
@@ -11,6 +13,7 @@ class DbService extends ChangeNotifier {
 
   final SupabaseService _supabase = SupabaseService();
   final AuthService _auth = AuthService();
+  final MlService _ml = MlService();
 
   // In-memory cache for fast UI updates & offline fallback
   final List<Map<String, dynamic>> _moodLogs = [];
@@ -19,11 +22,16 @@ class DbService extends ChangeNotifier {
   final List<Map<String, dynamic>> _companionChats = [];
   final List<Map<String, dynamic>> _hrIngestionBatches = [];
 
+  /// Pseudonymized feature rows accepted by HR ingestion. These are the only
+  /// records that ever reach the analytics/ML layer — never names or PF numbers.
+  final List<Map<String, dynamic>> _hrFeatureRecords = [];
+
   List<Map<String, dynamic>> get moodLogs => List.unmodifiable(_moodLogs);
   List<Map<String, dynamic>> get assessments => List.unmodifiable(_assessments);
   List<Map<String, dynamic>> get counselingSessions => List.unmodifiable(_counselingSessions);
   List<Map<String, dynamic>> get companionChats => List.unmodifiable(_companionChats);
   List<Map<String, dynamic>> get hrIngestionBatches => List.unmodifiable(_hrIngestionBatches);
+  List<Map<String, dynamic>> get hrFeatureRecords => List.unmodifiable(_hrFeatureRecords);
 
   Future<void> init() async {
     // Seed initial demo counseling session
@@ -52,6 +60,108 @@ class DbService extends ChangeNotifier {
         'created_at': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
       });
     }
+
+    // Seed a pseudonymized demo cohort so the analytics board has a roster to
+    // score on first launch, before any CSV has been ingested.
+    if (_hrFeatureRecords.isEmpty) {
+      _hrFeatureRecords.addAll(_generateDemoCohort(24));
+    }
+  }
+
+  /// Builds a deterministic pseudonymized cohort spanning the full risk range.
+  /// Deterministic seeding keeps demo runs reproducible for reviewers.
+  List<Map<String, dynamic>> _generateDemoCohort(int count) {
+    final rng = Random(42);
+    const zones = ['Northern Sector', 'Eastern Sector', 'Western Sector'];
+    const tiers = ['CI_OPS', 'BORDER_OUTPOST', 'HIGH_ALTITUDE', 'PEACE'];
+
+    return List.generate(count, (i) {
+      // Roughly a fifth of the cohort carries genuine strain indicators.
+      final strained = i % 5 == 0;
+      final veryStrained = i % 11 == 0;
+
+      return {
+        'pseudonym_token': 'TOKEN-${(1000 + i * 37).toRadixString(16).toUpperCase()}',
+        'unit_code': 'UNIT-${101 + (i % 6)}',
+        'location_tier': tiers[veryStrained ? 0 : (i % tiers.length)],
+        'deployment_zone': zones[i % zones.length],
+        'shift_type': strained ? 'Extended Rotation' : 'Standard Rotation',
+        'duty_hours_weekly': strained ? 78.0 + rng.nextInt(14) : 48.0 + rng.nextInt(10),
+        'leave_balance_days': strained ? 44.0 + rng.nextInt(16) : 14.0 + rng.nextInt(12),
+        'consecutive_active_days': veryStrained
+            ? 26 + rng.nextInt(6)
+            : (strained ? 19 + rng.nextInt(5) : 4 + rng.nextInt(9)),
+        'sleep_quality': veryStrained ? 1 : (strained ? 2 : 4),
+        'physical_exhaustion': veryStrained ? 5 : (strained ? 4 : 2),
+        'workload_perception': strained ? 5 : 2,
+        'mood_rating': veryStrained ? 1 : (strained ? 2 : 4),
+        'manager_relationship': strained ? 2 : 4,
+        'peer_social_support': strained ? 2 : 4,
+        'transfer_count_last_12m': strained ? 3 : 1,
+      };
+    });
+  }
+
+  /// Translates the pseudonymized roster into `ScorePredictionRequest` payloads
+  /// for `POST /api/v1/score/batch`. Each person is expanded into a 30-day
+  /// window of HR records plus periodic wellness check-ins, which is exactly
+  /// what the service's feature-engineering pipeline expects.
+  List<Map<String, dynamic>> buildCohortScoringPayload({int windowDays = 30}) {
+    final today = DateTime.now();
+
+    return _hrFeatureRecords.map((person) {
+      final token = person['pseudonym_token'] as String;
+      final weeklyHours = (person['duty_hours_weekly'] as num?)?.toDouble() ?? 48.0;
+      final dailyHours = (weeklyHours / 7).clamp(0.0, 24.0);
+      final consecutive = (person['consecutive_active_days'] as num?)?.toInt() ?? 5;
+      final leaveBalance = (person['leave_balance_days'] as num?)?.toDouble() ?? 20.0;
+      final tier = person['location_tier'] as String? ?? 'PEACE';
+      final unit = person['unit_code'] as String? ?? 'UNIT-101';
+
+      final hrRecords = List.generate(windowDays, (d) {
+        final date = today.subtract(Duration(days: windowDays - d));
+        // A rest day only appears once the consecutive-duty streak would break.
+        final isRestDay = consecutive < 15 && d % 7 == 6;
+        return {
+          'pseudonym_token': token,
+          'record_date': date.toIso8601String().split('T')[0],
+          'unit_code': unit,
+          'location_tier': tier,
+          'shift_hours': isRestDay ? 0.0 : dailyHours,
+          'is_rest_day': isRestDay,
+          'leave_taken_days': isRestDay ? 1.0 : 0.0,
+          'leave_balance_days': leaveBalance,
+          'consecutive_active_days': isRestDay ? 0 : min(consecutive, d + 1),
+          'transfer_count_last_12m':
+              (person['transfer_count_last_12m'] as num?)?.toInt() ?? 1,
+          'training_load_hours': isRestDay ? 0.0 : 2.0,
+          'synthetic': true,
+        };
+      });
+
+      // Six private wellness check-ins across the window.
+      final assessments = List.generate(6, (a) {
+        final date = today.subtract(Duration(days: (windowDays ~/ 6) * (6 - a)));
+        return {
+          'pseudonym_token': token,
+          'assessment_date': date.toIso8601String().split('T')[0],
+          'workload_perception': person['workload_perception'] ?? 3,
+          'mood_rating': person['mood_rating'] ?? 3,
+          'manager_relationship': person['manager_relationship'] ?? 3,
+          'sleep_quality': person['sleep_quality'] ?? 3,
+          'physical_exhaustion': person['physical_exhaustion'] ?? 3,
+          'peer_social_support': person['peer_social_support'] ?? 3,
+          'synthetic': true,
+        };
+      });
+
+      return {
+        'pseudonym_token': token,
+        'recent_hr_records': hrRecords,
+        'recent_assessments': assessments,
+        'recent_crisis_cue_detected': false,
+      };
+    }).toList();
   }
 
   // --- 1. MOOD LOGS ---
@@ -224,12 +334,26 @@ class DbService extends ChangeNotifier {
       final pseudonymToken = sha256.convert(tokenBytes).toString().substring(0, 16);
 
       accepted++;
+
+      // Derive the operational strain signals the analytics layer consumes.
+      // Everything below is keyed on the pseudonym token only.
+      final strained = dutyHours > 70 || leaveBalance > 40;
       acceptedRecords.add({
         'pseudonym_token': pseudonymToken,
         'leave_balance_days': leaveBalance,
         'duty_hours_weekly': dutyHours,
         'deployment_zone': 'Northern Sector',
-        'shift_type': 'Standard Rotation',
+        'shift_type': strained ? 'Extended Rotation' : 'Standard Rotation',
+        'unit_code': 'UNIT-${101 + (i % 6)}',
+        'location_tier': strained ? 'CI_OPS' : 'PEACE',
+        'consecutive_active_days': strained ? 22 : 6,
+        'sleep_quality': strained ? 2 : 4,
+        'physical_exhaustion': strained ? 4 : 2,
+        'workload_perception': strained ? 5 : 2,
+        'mood_rating': strained ? 2 : 4,
+        'manager_relationship': strained ? 2 : 4,
+        'peer_social_support': strained ? 2 : 4,
+        'transfer_count_last_12m': strained ? 3 : 1,
       });
     }
 
@@ -245,6 +369,14 @@ class DbService extends ChangeNotifier {
     };
 
     _hrIngestionBatches.insert(0, batch);
+
+    // Newly ingested personnel replace the seeded demo cohort so the analytics
+    // board scores the roster that was actually uploaded.
+    if (acceptedRecords.isNotEmpty) {
+      _hrFeatureRecords
+        ..clear()
+        ..addAll(acceptedRecords);
+    }
     notifyListeners();
 
     // Supabase push
@@ -282,30 +414,19 @@ class DbService extends ChangeNotifier {
     _companionChats.add(userMsg);
     notifyListeners();
 
-    // High-recall crisis classifier per PRD §4
-    final lower = text.toLowerCase();
-    final crisisKeywords = [
-      'suicide', 'kill myself', 'end my life', 'end it all', 'die', 
-      'hopeless', 'no reason to live', 'cannot take this anymore', 
-      'give up', 'hurt myself', 'can\'t go on'
-    ];
+    // Two-tier NLP per PRD §4, served by the ML microservice.
+    // Tier 2 (high-recall crisis) gates the response; Tier 1 (routine
+    // sentiment) feeds the longitudinal stress trend used by risk scoring.
+    final crisis = await _ml.classifyCrisis(
+      text,
+      pseudonymToken: _auth.currentUser?.serviceId,
+    );
+    final sentiment = await _ml.analyzeSentiment(text);
 
-    bool isCrisis = false;
-    String? detectedKeyword;
-    for (final kw in crisisKeywords) {
-      if (lower.contains(kw)) {
-        isCrisis = true;
-        detectedKeyword = kw;
-        break;
-      }
-    }
+    final isCrisis = crisis.crisisDetected;
+    final botReply = crisis.stabilizingResponseHint;
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    String botReply;
     if (isCrisis) {
-      botReply = 'I hear how deeply challenging things feel right now, and I want you to know you are not alone. Please stay with me. Tele-MANAS (14416) is available right this second with confidential, compassionate professional support.';
-      
       // Auto-escalate alert
       final client = _supabase.client;
       if (client != null && !_supabase.isMockMode) {
@@ -313,19 +434,13 @@ class DbService extends ChangeNotifier {
           await client.from('crisis_alerts').insert({
             'user_id': _auth.currentUser?.id ?? 'demo-user',
             'trigger_source': 'ai_companion_nlu',
-            'tele_manas_notified': true,
-            'welfare_officer_alerted': true,
+            'crisis_probability': crisis.crisisProbability,
+            'risk_indicators': crisis.riskIndicators,
+            'tele_manas_notified': crisis.escalationTriggered,
+            'welfare_officer_alerted': crisis.escalationTriggered,
             'status': 'active_stabilization',
           });
         } catch (_) {}
-      }
-    } else {
-      if (lower.contains('stress') || lower.contains('tired') || lower.contains('shift')) {
-        botReply = 'Operational fatigue is very real, especially after long rotations. Take a slow, steady breath. Would you like to do a quick 2-minute box breathing cycle together, or simply talk through your day?';
-      } else if (lower.contains('sleep') || lower.contains('night')) {
-        botReply = 'Rest is the foundation of endurance. Disrupted sleep can increase cognitive strain. Let\'s try easing the rhythm with calming breathing in our Self-Help section.';
-      } else {
-        botReply = 'Thank you for sharing that with me. I am here to listen anytime in complete confidence. What is on your mind today?';
       }
     }
 
@@ -334,7 +449,9 @@ class DbService extends ChangeNotifier {
       'sender': 'assistant',
       'message': botReply,
       'is_crisis': isCrisis,
-      'crisis_keyword': detectedKeyword,
+      'crisis_probability': crisis.crisisProbability,
+      'risk_indicators': crisis.riskIndicators,
+      'sentiment_label': sentiment.sentimentLabel,
       'created_at': DateTime.now().toIso8601String(),
     };
     _companionChats.add(botMsg);
@@ -343,6 +460,13 @@ class DbService extends ChangeNotifier {
     return {
       'reply': botReply,
       'isCrisis': isCrisis,
+      'riskIndicators': crisis.riskIndicators,
+      'priority': crisis.priority,
+      'recommendedAction': crisis.recommendedAction,
+      'sentimentLabel': sentiment.sentimentLabel,
+      'stressProbability': sentiment.stressProbability,
+      'fatigueIndicators': sentiment.fatigueIndicators,
+      'servedByMlService': _ml.isOnline,
     };
   }
 }

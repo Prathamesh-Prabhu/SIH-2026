@@ -13,6 +13,7 @@ import '../screens/profile_screen.dart';
 import '../screens/hr_admin_overview_screen.dart';
 import '../screens/hr_data_ingestion_screen.dart';
 import '../screens/hr_mobile_ingestion_review_screen.dart';
+import '../screens/hr_risk_analytics_screen.dart';
 import '../screens/institutional_resilience_screen.dart';
 
 class AppRouter {
@@ -74,6 +75,10 @@ class AppRouter {
       GoRoute(
         path: '/hr-mobile-review',
         builder: (context, state) => const HrMobileIngestionReviewScreen(),
+      ),
+      GoRoute(
+        path: '/hr-analytics',
+        builder: (context, state) => const HrRiskAnalyticsScreen(),
       ),
       GoRoute(
         path: '/resilience',

@@ -20,6 +20,11 @@ class _AiCompanionScreenState extends State<AiCompanionScreen> with SingleTicker
   bool _isSending = false;
   bool _crisisModeActive = false;
 
+  // Latest Tier 1 / Tier 2 NLP output from the Analytics & ML microservice.
+  String? _sentimentLabel;
+  List<String> _riskIndicators = const [];
+  bool _servedByMlService = false;
+
   final List<Map<String, dynamic>> _messages = [
     {
       'sender': 'assistant',
@@ -57,6 +62,12 @@ class _AiCompanionScreenState extends State<AiCompanionScreen> with SingleTicker
           'message': result['reply'] as String,
           'is_crisis': result['isCrisis'] as bool,
         });
+        _sentimentLabel = result['sentimentLabel'] as String?;
+        _riskIndicators =
+            (result['riskIndicators'] as List<dynamic>? ?? const [])
+                .map((e) => e.toString())
+                .toList();
+        _servedByMlService = result['servedByMlService'] as bool? ?? false;
         if (result['isCrisis'] == true) {
           _crisisModeActive = true;
           _showTeleManasDialog();
@@ -97,16 +108,43 @@ class _AiCompanionScreenState extends State<AiCompanionScreen> with SingleTicker
             ),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Your safety and mental peace come first. We detected high situational stress in your message.',
               style: TextStyle(fontSize: 13),
             ),
-            SizedBox(height: 12),
-            Text(
+            // Tier 2 classifier attributions, shown so the escalation is never
+            // an unexplained black-box action.
+            if (_riskIndicators.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.errorContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _riskIndicators
+                      .map((r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '• $r',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.error,
+                                  height: 1.35),
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            const Text(
               'Tele-MANAS (14416) is India\'s 24/7 dedicated confidential armed forces & citizen psychological helpline. Free and immediate.',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.secondary),
             ),
@@ -149,6 +187,35 @@ class _AiCompanionScreenState extends State<AiCompanionScreen> with SingleTicker
         ),
         title: const Text('AI Companion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
+          // Tier 1 sentiment read-back, so the user can see what the companion
+          // inferred rather than it being invisible.
+          if (_sentimentLabel != null)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _servedByMlService ? Icons.psychology_alt : Icons.offline_bolt,
+                    size: 12,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _sentimentLabel!,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

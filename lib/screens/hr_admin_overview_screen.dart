@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/db_service.dart';
+import '../services/ml_service.dart';
+import '../widgets/ml_settings_dialog.dart';
 import '../widgets/quick_screen_switcher.dart';
 import '../widgets/supabase_settings_dialog.dart';
 
@@ -45,6 +47,11 @@ class HrAdminOverviewScreen extends StatelessWidget {
             icon: const Icon(Icons.hub_outlined, color: Colors.black54),
             tooltip: 'Supabase Settings',
             onPressed: () => SupabaseSettingsDialog.show(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.insights_outlined, color: Colors.black54),
+            tooltip: 'Analytics & ML Service',
+            onPressed: () => MlSettingsDialog.show(context),
           ),
           IconButton(
             icon: const Icon(Icons.mobile_friendly_rounded, color: Colors.black54),
@@ -106,6 +113,10 @@ class HrAdminOverviewScreen extends StatelessWidget {
                   _statCard('82%', 'Leave Balance Health', Icons.beach_access_outlined, Colors.blue[700]!),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // Entry point into the ML-backed welfare risk analytics board
+              _analyticsCard(context),
               const SizedBox(height: 24),
 
               // Pseudonymization Compliance Banner
@@ -228,6 +239,86 @@ class HrAdminOverviewScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Gateway to the predictive analytics board. Live/offline state comes from
+  /// [MlService] so an HR admin can see at a glance whether the microservice
+  /// is answering before they open the board.
+  Widget _analyticsCard(BuildContext context) {
+    final ml = MlService();
+    final online = ml.isOnline;
+
+    return InkWell(
+      onTap: () => context.go('/hr-analytics'),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF02241F), Color(0xFF1A3A34)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.insights_rounded,
+                  color: Color(0xFFBAEDDE), size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Welfare Risk Analytics',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'XGBoost behavioural risk bands & factor attributions over the pseudonymized roster',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF83A49C), height: 1.35),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: online
+                              ? const Color(0xFF6BD6B4)
+                              : const Color(0xFFE0A458),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        online ? 'ML service online' : 'ML service offline • fallback active',
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xFF83A49C)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: Color(0xFF83A49C), size: 16),
+          ],
         ),
       ),
     );

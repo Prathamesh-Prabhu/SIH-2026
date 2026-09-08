@@ -51,7 +51,8 @@ class _SwitcherContent extends StatelessWidget {
       {'name': '12. HR Admin Console Overview', 'route': '/hr-overview', 'icon': Icons.admin_panel_settings_outlined, 'group': 'HR & Command'},
       {'name': '13. HR Tier-2 Data Ingestion (CSV)', 'route': '/hr-ingestion', 'icon': Icons.cloud_upload_outlined, 'group': 'HR & Command'},
       {'name': '14. HR Mobile Ingestion Review', 'route': '/hr-mobile-review', 'icon': Icons.mobile_friendly_rounded, 'group': 'HR & Command'},
-      {'name': '15. Institutional Resilience', 'route': '/resilience', 'icon': Icons.shield_outlined, 'group': 'HR & Command'},
+      {'name': '15. Welfare Risk Analytics (ML)', 'route': '/hr-analytics', 'icon': Icons.insights_rounded, 'group': 'HR & Command'},
+      {'name': '16. Institutional Resilience', 'route': '/resilience', 'icon': Icons.shield_outlined, 'group': 'HR & Command'},
     ];
 
     return Container(
