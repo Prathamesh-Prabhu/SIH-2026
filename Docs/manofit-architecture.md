@@ -26,12 +26,12 @@
                          └────────────┬─────────────┘
                                       │ check-ins, companion chat, self-help
                                       ▼
-   ┌───────────┐        ┌─────────────────────────────┐        ┌────────────────┐
-   │  HR ADMIN │──CSV/──▶│                             │──────▶│   HR / HRMS     │
-   │(Flutter Web│  XLSX/  │        MANOFIT              │◀──API──│  (external,     │
-   │ or portal) │  API    │        PLATFORM             │         Tier-1 systems)│
-   └───────────┘        │                             │        └────────────────┘
-                         │                             │
+   ┌───────────┐        ┌─────────────────────────────┐
+   │  HR ADMIN │──.xlsx/─▶│                             │
+   │(Flutter Web)│  .csv    │        MANOFIT              │
+   │            │  upload  │        PLATFORM             │
+   │            │  ONLY    │                             │
+   └───────────┘        │                             │
    ┌────────────────┐   │                             │   ┌─────────────────────┐
    │ WELFARE OFFICER│◀──┤                             ├──▶│   TELE-MANAS (14416)  │
    │ (Flutter Web)  │   │                             │    │ national helpline API │
@@ -64,7 +64,7 @@
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  API / EDGE LAYER  (Supabase Edge Functions, Deno/TypeScript)             │
-│  • Auth verification & session issuance   • Upload handlers (Tier 2)      │
+│  • Auth verification & session issuance   • Upload handlers (.xlsx/.csv)   │
 │  • Pseudonymization service                • Alert dispatch (Tele-MANAS,  │
 │  • Consent-ledger writes                     Welfare Officer notify)      │
 │  • ML-inference trigger/orchestration      • Re-identification broker     │
@@ -92,15 +92,16 @@
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  ANALYTICS / ML LAYER (Python microservice, FastAPI — separate service,   │
 │  called from Supabase Edge Functions via authenticated internal API)     │
-│  • Feature engineering  • Behavioral risk model (XGBoost/LightGBM)        │
-│  • NLP sentiment + crisis-detection models (companion transcripts)        │
-│  • Ensemble scoring + SHAP explainability  • Model validation/versioning  │
-│  • Synthetic-data generator (Phase 1 bootstrap, schema-matched)           │
+│  • Feature engineering (30/60/90d, ~32 PS-traceable features)             │
+│  • Channel-routed gradient-boosted risk ensemble + isotonic calibration   │
+│  • NLP sentiment + high-recall crisis models (companion transcripts)      │
+│  • Occlusion (SHAP-style) explainability  • Predictive/forecast surfacing │
+│  • Model validation/versioning, model card, one-file rollback            │
+│  • Synthetic-data generator (latent-variable, Phase 1, schema-matched)    │
 └───────────────────────────────┬────────────────────────────────────────┘
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  INTEGRATION LAYER                                                        │
-│  • HRMS Tier-1 connector (nightly batch, field allow-listed)              │
 │  • Tele-MANAS API (crisis auto-notify)                                    │
 │  • Health Connect / HealthKit via Flutter `health` package (wearables,    │
 │    Phase 3 only)                                                          │
@@ -118,7 +119,7 @@ dev/staging/prod Supabase projects.
 | Component | Reads | Writes | Never touches |
 |---|---|---|---|
 | Personnel app (Flutter) | Own activity/journal/assessment data | Own check-ins, doodles, assessments, companion transcripts (opt-in) | Any risk score/band, any other user's data |
-| HR Admin (Flutter Web) | Ingestion status, own upload history | Raw HR files → pseudonymization pipeline | Risk scores, individual analytics output |
+| HR Admin (Flutter Web) | Ingestion status + own upload history; **aggregate/unit-level risk analytics + predictive-engine views** (no identities) | Raw HR file uploads (`.xlsx`/`.csv`) → pseudonymization pipeline | Individual identities, individual risk scores, the identity vault, the Welfare Officer case queue |
 | Pseudonymization Edge Function | Raw uploaded HR rows | `hr_features` (pseudonymized) + identity-vault mapping | — |
 | ML microservice | `hr_features`, `assessments`, consented companion transcripts, synthetic datasets | `risk_assessments` (band + explainability only) | Raw HR records, real identities, free-text journal content |
 | Welfare Officer console (Flutter Web) | `risk_assessments` (individual, post-review), case log | Intervention/case notes | Raw HR data, other units' cases without scope |
@@ -132,25 +133,26 @@ dev/staging/prod Supabase projects.
 ## 5. Data Flow — HR Ingestion (Phase 1)
 
 ```
-HRMS (Tier 1)                  HR Admin (Tier 2, Flutter Web)
-   │ nightly batch                 │ uploads .csv/.xlsx
-   ▼                               ▼
-Field allow-list filter      Supabase Storage (signed URL, short-lived)
-   │                               │
-   └───────────────┬───────────────┘
-                    ▼
-        Edge Function: parse → validate schema → dedupe
-                    │
-                    ▼
-        Pseudonymization (Service/PF number → rotating token)
-                    │
-          ┌─────────┴─────────┐
-          ▼                   ▼
-  identity-vault write   hr_features (Postgres, RLS-protected)
-  (isolated project)            │
-                                 ▼
-                    Audit log entry + ingestion status
-                    → shown to HR Admin (accepted/rejected rows only)
+HR Admin (Flutter Web) — the ONLY ingestion path
+   │ uploads .xlsx / .csv  (no HRMS API/SFTP connector, no manual entry form)
+   ▼
+Supabase Storage (signed URL, short-lived; .xlsx/.csv only, type-sniffed)
+   │
+   ▼
+Edge Function: parse → validate schema → dedupe
+   │
+   ▼
+Pseudonymization (Service/PF number → rotating token)
+   │
+ ┌─────────┴─────────┐
+ ▼                   ▼
+identity-vault write   hr_features (Postgres, RLS-protected)
+(isolated project)            │
+                               ▼
+                  Audit log entry + ingestion status
+                  → HR Admin sees accepted/rejected rows;
+                    aggregate risk analytics + predictive views
+                    update once scoring runs (no individual data)
 ```
 
 ---
@@ -217,7 +219,7 @@ Edge Function: routine sentiment classifier
 - **RBAC** enforced at the Postgres RLS layer, mapped 1:1 to Supabase Auth roles: `personnel`, `hr_admin`, `welfare_officer`, `commander`, `oversight_board`.
 - **Identity-mapping vault isolation**: separate Supabase project, separate keys, reachable only through the re-identification broker Edge Function (two authorized approvers + audit log per lookup) — the *only* path from a pseudonym back to a real identity anywhere in the system.
 - **Encryption**: TLS 1.3 in transit; AES-256 at rest via Postgres encryption + `pgsodium`/Vault-managed keys.
-- **Differential privacy** on any Commander-facing aggregate view so small cohorts can't be reverse-engineered.
+- **Differential privacy** on any Commander-facing **and HR-Admin-facing** aggregate/predictive view so small cohorts can't be reverse-engineered. The `hr_admin` role reads aggregate `risk_assessments` rollups only — never an individual row, never an identity (RLS-enforced, same as `commander`).
 - **Immutable audit log**: every access to `hr_features`, `risk_assessments`, or the identity vault logged with actor, timestamp, justification — Oversight Board read-only.
 - **No cross-system linkage**: no API connection to disciplinary/performance-review systems — enforced architecturally, not just by policy.
 
@@ -344,7 +346,7 @@ and rollback-able without touching Supabase.
 
 | Phase (see `manofit-prd.md` §9) | What gets built here |
 |---|---|
-| **Phase 1** | Data layer + RLS, identity vault, Tiers 1–3 ingestion, HR Admin (Flutter Web), Assessments (Flutter mobile), synthetic data generator, full ML/analytics layer (§6) |
+| **Phase 1** | **ML/analytics layer as the largest slice (§6)** — engine, explainability, synthetic generator, validation/governance, graphical/predictive surfacing; data layer + RLS, identity vault, file-upload ingestion (`.xlsx`/`.csv` only), analytics-first HR Admin console (Flutter Web), Assessments (Flutter mobile) |
 | **Phase 2** | Welfare Officer/Commander/Oversight consoles (§8 in PRD), live AI companion + crisis escalation (§7), Home + mood check-in |
 | **Phase 3** | Self-Help/doodle, Book, Profile, workshop request, wearable integration (`health` package), motion polish, CI/CD hardening, DR |
 

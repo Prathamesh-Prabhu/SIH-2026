@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../services/ml_service.dart';
+import '../services/supabase_service.dart';
 
 /// Lets a reviewer point the app at a running Analytics & ML microservice
 /// without rebuilding — useful when the service runs on another host or when
@@ -67,6 +69,9 @@ class _MlSettingsDialogState extends State<MlSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final sb = context.watch<SupabaseService>();
+    final remoteMl = sb.remoteMlUrl;
+
     return AlertDialog(
       backgroundColor: AppColors.surfaceContainerLowest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -99,11 +104,9 @@ class _MlSettingsDialogState extends State<MlSettingsDialog> {
               child: Row(
                 children: [
                   Icon(
-                    _ml.isOnline ? Icons.check_circle : Icons.cloud_off,
+                    _ml.isOnline ? Icons.check_circle : Icons.error_outline,
                     size: 16,
-                    color: _ml.isOnline
-                        ? AppColors.secondary
-                        : AppColors.onSurfaceVariant,
+                    color: _ml.isOnline ? AppColors.secondary : AppColors.error,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -127,6 +130,31 @@ class _MlSettingsDialogState extends State<MlSettingsDialog> {
               ),
               style: const TextStyle(fontSize: 13),
             ),
+            if (remoteMl != null && remoteMl.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.cloud_done_outlined, size: 14, color: AppColors.secondary),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Auto-synced from Supabase (system_config)',
+                      style: TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                    onPressed: () {
+                      setState(() {
+                        _urlController.text = remoteMl;
+                      });
+                      _saveAndTest();
+                    },
+                    child: const Text('Reset to auto', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _tokenController,
@@ -139,9 +167,8 @@ class _MlSettingsDialogState extends State<MlSettingsDialog> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Android emulator reaches the host at 10.0.2.2. A USB handset '
-              'reaches it at localhost once you run:\n'
-              'adb reverse tcp:8000 tcp:8000',
+              'Zero-paste: start-backends.ps1 automatically syncs Cloudflare URLs to Supabase.\n'
+              'Manual entry is only needed for overrides.',
               style: TextStyle(
                   fontSize: 11,
                   color: AppColors.onSurfaceVariant,

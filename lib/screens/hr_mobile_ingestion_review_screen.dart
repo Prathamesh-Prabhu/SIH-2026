@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/db_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
 class HrMobileIngestionReviewScreen extends StatelessWidget {
   const HrMobileIngestionReviewScreen({super.key});
@@ -10,25 +9,62 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = DbService();
-    final batch = db.hrIngestionBatches.isNotEmpty
-        ? db.hrIngestionBatches.first
-        : {
-            'id': 'batch-8842',
-            'filename': 'CAPF_Sector4_Roster_Q1.csv',
-            'file_size_kb': 245.5,
-            'total_rows': 520,
-            'accepted_rows': 514,
-            'rejected_rows': 6,
-            'status': 'committed',
-          };
+    final batch = db.hrIngestionBatches.isNotEmpty ? db.hrIngestionBatches.first : null;
+
+    if (batch == null) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.backOr('/hr-overview'),
+          ),
+          title: const Text('Batch Review',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.inbox_outlined, size: 40, color: AppColors.onSurfaceVariant),
+                  const SizedBox(height: 12),
+                  const Text('No batch to review',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Ingest a roster through the Tier 2 portal first — the most '
+                    'recent committed batch appears here for duty-officer sign-off.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, height: 1.4, color: AppColors.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => context.backOr('/hr-overview'),
+                    icon: const Icon(Icons.arrow_back, size: 16),
+                    label: const Text('Back to console'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final total = (batch['total_rows'] as num?)?.toInt() ?? 0;
+    final accepted = (batch['accepted_rows'] as num?)?.toInt() ?? 0;
+    final rejected = (batch['rejected_rows'] as num?)?.toInt() ?? 0;
+    final parity = total == 0 ? 0.0 : accepted / total;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/hr-overview'),
+          onPressed: () => context.backOr('/hr-overview'),
         ),
         title: const Text('Batch Review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
@@ -86,10 +122,15 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          batch['filename'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
+                        Expanded(
+                          child: Text(
+                            '${batch['filename']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -107,14 +148,15 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     // Progress Bar
-                    const Text('PARITY COMPLIANCE (98.8%)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: AppColors.outline)),
+                    Text('PARITY COMPLIANCE (${(parity * 100).toStringAsFixed(1)}%)',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: AppColors.outline)),
                     const SizedBox(height: 6),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: const LinearProgressIndicator(
-                        value: 0.988,
+                      child: LinearProgressIndicator(
+                        value: parity,
                         backgroundColor: AppColors.surfaceContainerHigh,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.secondary),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.secondary),
                         minHeight: 8,
                       ),
                     ),
@@ -125,7 +167,7 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${batch['accepted_rows']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+                              Text('$accepted', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.secondary)),
                               const Text('Accepted Rows', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
                             ],
                           ),
@@ -134,7 +176,7 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${batch['rejected_rows']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.error)),
+                              Text('$rejected', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.error)),
                               const Text('Schema Anomalies', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
                             ],
                           ),
@@ -188,7 +230,7 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                         backgroundColor: AppColors.secondary,
                       ),
                     );
-                    context.go('/hr-overview');
+                    context.backOr('/hr-overview');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryContainer,

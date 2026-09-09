@@ -1,0 +1,22 @@
+service_id,unit_code,deployment_zone,duty_hours,leave_balance,consecutive_days,workload_perception,sleep_quality,exhaustion,mood_rating,peer_support
+CAPF-90112,UNIT-104,High Altitude Outpost,86,52,27,5,2,5,2,3
+CAPF-90113,UNIT-104,High Altitude Outpost,78,47,24,5,2,4,2,2
+CAPF-90114,UNIT-104,CI Ops Corridor,74,44,21,4,3,4,3,3
+CAPF-90115,UNIT-101,Border Outpost,71,41,20,4,2,4,3,2
+CAPF-90116,UNIT-101,Border Outpost,63,38,16,4,3,3,3,4
+CAPF-90117,UNIT-101,Border Outpost,58,34,14,3,4,3,4,4
+CAPF-90118,UNIT-106,CI Ops Corridor,61,40,17,4,3,4,3,3
+CAPF-90119,UNIT-106,CI Ops Corridor,56,30,12,3,4,2,4,4
+CAPF-90120,UNIT-106,Peace Station,49,22,7,2,4,2,4,4
+CAPF-90121,UNIT-102,Peace Station,46,18,5,4,4,2,3,3
+CAPF-90122,UNIT-102,Peace Station,44,16,4,2,5,1,5,5
+CAPF-90123,UNIT-102,Border Outpost,50,24,8,3,4,2,4,4
+CAPF-90124,UNIT-103,Peace Station,42,14,3,4,3,3,2,2
+CAPF-90125,UNIT-103,Peace Station,45,20,6,3,4,2,4,4
+CAPF-90126,UNIT-103,Training Wing,48,26,9,4,4,3,3,3
+CAPF-90127,UNIT-105,Desert Forward Post,66,43,18,5,3,4,2,3
+CAPF-90128,UNIT-105,Desert Forward Post,72,49,22,5,2,4,3,3
+CAPF-90129,UNIT-105,Peace Station,47,19,6,3,4,2,4,4
+,UNIT-102,Peace Station,45,20,5,3,4,2,4,4
+CAPF-90131,UNIT-103,Peace Station,not-logged,21,7,4,4,2,3,3
+CAPF-90112,UNIT-104,High Altitude Outpost,86,52,27,5,2,5,2,3

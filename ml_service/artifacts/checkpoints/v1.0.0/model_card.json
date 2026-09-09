@@ -1,0 +1,48 @@
+{
+  "model_id": "manofit-risk-v1.0.0",
+  "model_name": "ManoFit Behavioral & Stress Risk Predictive Model",
+  "model_type": "XGBoost Classifier",
+  "version": "v1.0.0",
+  "training_window": "90-day rolling synthetic & anonymized operational records",
+  "sample_size": 500,
+  "features_utilized": [
+    "consecutive_duty_days_max_30d",
+    "avg_shift_hours_30d",
+    "leave_utilization_ratio_30d",
+    "rest_day_deficit_ratio_30d",
+    "high_hardship_exposure_ratio_30d",
+    "avg_sleep_score_30d",
+    "avg_exhaustion_score_30d",
+    "composite_assessment_score_30d",
+    "avg_shift_hours_60d",
+    "leave_utilization_ratio_60d",
+    "composite_assessment_score_60d",
+    "deployment_changes_90d",
+    "days_at_current_deployment",
+    "consecutive_duty_days_max_90d",
+    "leave_utilization_ratio_90d",
+    "transfer_frequency_rate_90d",
+    "training_load_trend_slope",
+    "mood_trend_slope",
+    "workload_trend_slope",
+    "sleep_deterioration_delta",
+    "nlp_stress_trend_score"
+  ],
+  "metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "roc_auc": 1.0
+  },
+  "known_limitations": [
+    "Model operates exclusively on pseudonymized rolling aggregations; no direct clinical diagnoses.",
+    "Subject to monthly recalibration by Welfare Clinical Review Board.",
+    "Zero cross-linkage to disciplinary or performance evaluation records.",
+    "Phase 1 training labels are rule-based synthetic stand-ins, not clinical outcomes. Because those labels are derived from the same features the model reads, reported training metrics are near-perfect by construction and MUST NOT be read as real-world accuracy. Genuine performance is unknown until the Phase 2 clinical-review loop supplies reviewed labels.",
+    "Trained on synthetic bootstrap data only; no real personnel records have been seen by this version."
+  ],
+  "last_validated_date": "2026-09-09",
+  "oversight_board_approved": true,
+  "is_active": true
+}

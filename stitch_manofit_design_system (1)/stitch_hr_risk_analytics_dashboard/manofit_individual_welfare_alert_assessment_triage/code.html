@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ManoFit Welfare Platform</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#f3fbf6;}body{overscroll-behavior-y:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-variant": "#dce4e0", "on-secondary": "#ffffff", "tertiary-fixed-dim": "#79d4e2", "on-secondary-fixed-variant": "#0e5138", "outline-variant": "#c1c8c2", "on-tertiary-fixed-variant": "#004f57", "tertiary-container": "#00434a", "surface-container": "#e7f0eb", "surface-container-high": "#e2eae5", "on-tertiary": "#ffffff", "on-error-container": "#93000a", "surface": "#f3fbf6", "on-secondary-fixed": "#002114", "tertiary-fixed": "#95f1ff", "secondary-fixed-dim": "#95d4b3", "on-tertiary-container": "#56b4c1", "surface-tint": "#3f6653", "secondary-container": "#aeeecb", "on-error": "#ffffff", "inverse-on-surface": "#eaf3ee", "on-surface-variant": "#414844", "on-primary-fixed": "#002114", "on-primary-container": "#86af99", "on-primary-fixed-variant": "#274e3d", "surface-bright": "#f3fbf6", "error-container": "#ffdad6", "on-surface": "#151d1a", "background": "#f3fbf6", "secondary": "#2c694e", "error": "#ba1a1a", "outline": "#717973", "tertiary": "#002b31", "surface-container-highest": "#dce4e0", "primary-fixed-dim": "#a5d0b9", "primary-fixed": "#c1ecd4", "on-primary": "#ffffff", "primary-container": "#1b4332", "on-tertiary-fixed": "#001f24", "inverse-surface": "#2a322f", "surface-container-low": "#edf6f1", "surface-container-lowest": "#ffffff", "on-background": "#151d1a", "secondary-fixed": "#b1f0ce", "on-secondary-container": "#316e52", "inverse-primary": "#a5d0b9", "primary": "#012d1d", "surface-dim": "#d4dcd7" }, borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, spacing: { "space-md": "0.75rem", "col-gutter": "0.75rem", "space-2xl": "2rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-xl": "1.5rem", "space-3xl": "3rem", "space-xxs": "0.125rem", "panel-padding-compact": "0.75rem", "panel-padding-standard": "1.25rem", "space-base": "1rem", "space-lg": "1.25rem" }, fontFamily: { "headline-sm": ["Inter"], "headline-lg": ["Inter"], "code-md": ["Inter"], "label-lg": ["Inter"], "display-lg": ["Inter"], "body-lg": ["Inter"], "headline-md": ["Inter"], "body-md": ["Inter"], "label-sm": ["Inter"], "body-sm": ["Inter"], "label-md": ["Inter"], "display-md": ["Inter"] }, fontSize: { "headline-sm": ["15px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "600" }], "headline-lg": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "code-md": ["12px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }], "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "headline-md": ["18px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "body-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600" }], "display-md": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "700" }] } } } }</script></head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen selection:bg-secondary-container selection:text-on-secondary-container"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-space-base flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-xs min-w-0"><button aria-label="Back" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" onclick="history.back()"><span class="material-symbols-outlined text-[20px]">arrow_back</span></button><img alt="Brand logo. - Primary color: #1b4332
+- Font: inter
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnS6yCmq-KWRrfC3BGJc4lUX9Ye9kVVszkFtMUKEmiXIcJJ4Nj8G1ExL58GbiY5avngAf0G8dxaUgaxmV7rz8KRocY44rajjmAjDeF0J_Hs2dRO2Eswooo9kdLX8-xGN9TgOGfRhmGq1T2otLt7QniZySDfVKtvjS-yK5Sak19DSOPPq_G3AUkpH8UYDJLDLxhlsbEPZoL_qxu7dIZ7p8zK6VEKucy8bJ1cIm3gKXC4UIoX5bro_9BGw"/><div class="flex flex-col min-w-0 pl-1"><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight truncate">Alert Details</h1><span class="font-label-sm text-label-sm text-on-surface-variant truncate uppercase">Admin / Welfare Officer</span></div></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Alerts" class="w-11 h-11 relative flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2 right-2 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-error text-on-error font-label-sm text-[9px] leading-none font-bold">3</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-space-xxs"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 w-full bg-surface pt-16 pb-safe px-space-base"><div class="flex flex-col w-full pb-8 space-y-4">
+<!-- Elevated Wellbeing Concern Alert Banner -->
+<div class="w-full bg-[#fdedeb] rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+<div class="w-10 h-10 rounded-full bg-[#fcd4d1] flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-error text-[22px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between gap-2">
+<h2 class="font-headline-sm text-[13px] font-bold text-error tracking-wider uppercase">Elevated Wellbeing Concern</h2>
+<span class="bg-[#d9383a] text-on-error font-label-sm text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap shadow-sm">High Priority</span>
+</div>
+<p class="font-body-sm text-on-surface-variant text-[12px] leading-snug mt-1">
+        This person may need timely welfare support. Please review and take appropriate action.
+      </p>
+</div>
+</div>
+<!-- Protected Identity & Unit Profile Card -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col gap-3.5">
+<div class="flex items-center gap-3.5">
+<div class="w-13 h-13 w-12 h-12 rounded-full bg-[#dbe8e1] flex items-center justify-center text-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">person</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-on-surface-variant text-[11px] font-medium">Person ID</span>
+<div class="flex items-center gap-2">
+<span class="font-display-md text-[21px] font-bold tracking-tight text-on-surface">CAPF-7H2K</span>
+<span class="material-symbols-outlined text-outline text-[16px]">verified_user</span>
+</div>
+</div>
+</div>
+<!-- Metadata Grid -->
+<div class="grid grid-cols-3 gap-2 pt-2 border-t-0 bg-surface-container-low p-2.5 rounded-lg">
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-on-surface-variant text-[11px]">Unit</span>
+<span class="font-headline-sm text-on-surface text-[12.5px] truncate font-semibold">North Sector</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-on-surface-variant text-[11px]">Role</span>
+<span class="font-headline-sm text-on-surface text-[12.5px] truncate font-semibold">Field Personnel</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-on-surface-variant text-[11px]">Service Years</span>
+<span class="font-headline-sm text-on-surface text-[12.5px] truncate font-semibold">6 years</span>
+</div>
+</div>
+</div>
+<!-- Tab Navigation Bar -->
+<div class="w-full flex items-center justify-between border-b-0 px-1">
+<button class="flex flex-col items-center pb-2 relative group" id="tab-overview">
+<span class="font-label-lg text-primary text-[13.5px] font-bold">Overview</span>
+<span class="absolute bottom-0 left-0 right-0 h-[2.5px] bg-primary rounded-full"></span>
+</button>
+<button class="flex flex-col items-center pb-2 text-on-surface-variant hover:text-on-surface transition-colors" id="tab-assessments">
+<span class="font-label-lg text-[13px] font-medium">Assessments</span>
+</button>
+<button class="flex flex-col items-center pb-2 text-on-surface-variant hover:text-on-surface transition-colors" id="tab-trends">
+<span class="font-label-lg text-[13px] font-medium">Trends</span>
+</button>
+<button class="flex flex-col items-center pb-2 text-on-surface-variant hover:text-on-surface transition-colors" id="tab-model">
+<span class="font-label-lg text-[13px] font-medium">Model Insights</span>
+</button>
+</div>
+<!-- Wellbeing Trend History Section -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col space-y-3">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-headline-sm text-[15px] font-bold text-on-surface">Wellbeing Trend</h3>
+<div class="flex items-center gap-2 text-[10.5px] font-medium text-on-surface-variant">
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-[#2c694e]"></span>Low
+        </span>
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-[#f2a63b]"></span>Moderate
+        </span>
+<span class="inline-flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-[#dc3838]"></span>Elevated
+        </span>
+</div>
+</div>
+<!-- Trend Line Graph SVG -->
+<div class="w-full relative pt-2">
+<!-- Callout badge for Elevated Sep 2026 -->
+<div class="absolute right-3 top-2 bg-[#fff1f0] border-0 text-[#b42318] text-[9.5px] px-2 py-0.5 rounded-full font-bold shadow-sm flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-[#dc3838]"></span>
+        Elevated · Sep 2026
+      </div>
+<svg aria-label="Wellbeing trend chart over past 6 months" class="w-full h-32 overflow-visible" viewbox="0 0 320 125">
+<defs>
+<lineargradient id="elevatedGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#dc3838" stop-opacity="0.22"></stop>
+<stop offset="100%" stop-color="#dc3838" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<!-- Grid lines & percentages -->
+<text class="text-[9px] fill-[#717973] font-medium" x="0" y="20">100%</text>
+<line stroke="#edf1ed" stroke-dasharray="2 2" stroke-width="1" x1="26" x2="315" y1="18" y2="18"></line>
+<text class="text-[9px] fill-[#717973] font-medium" x="0" y="60">50%</text>
+<line stroke="#edf1ed" stroke-dasharray="2 2" stroke-width="1" x1="26" x2="315" y1="57" y2="57"></line>
+<text class="text-[9px] fill-[#717973] font-medium" x="6" y="98">0%</text>
+<line stroke="#e0e6e1" stroke-width="1" x1="26" x2="315" y1="95" y2="95"></line>
+<!-- Reference benchmark line (Low/Moderate) -->
+<path d="M 40 55 Q 85 70 140 70 T 235 77 T 295 78" fill="none" opacity="0.65" stroke="#2c694e" stroke-dasharray="3 3" stroke-width="1.75"></path>
+<!-- Primary Elevated Trajectory Path -->
+<path d="M 40 85 L 85 78 L 140 70 L 195 65 L 245 42 L 295 38" fill="none" stroke="#dc3838" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+<!-- Subtle fill under elevated section -->
+<path d="M 40 85 L 85 78 L 140 70 L 195 65 L 245 42 L 295 38 L 295 95 L 40 95 Z" fill="url(#elevatedGradient)"></path>
+<!-- Data points -->
+<circle cx="40" cy="85" fill="#2c694e" r="3.5"></circle>
+<circle cx="85" cy="78" fill="#2c694e" r="3.5"></circle>
+<circle cx="140" cy="70" fill="#e89e35" r="3.5"></circle>
+<circle cx="195" cy="65" fill="#e89e35" r="4"></circle>
+<circle cx="245" cy="42" fill="#dc3838" r="4"></circle>
+<!-- Highlighted current marker -->
+<circle cx="295" cy="38" fill="#dc3838" opacity="0.25" r="6"></circle>
+<circle cx="295" cy="38" fill="#dc3838" r="4" stroke="#ffffff" stroke-width="1.5"></circle>
+<!-- Month Labels -->
+<text class="text-[9px] fill-[#717973] font-medium" x="34" y="112">Apr</text>
+<text class="text-[9px] fill-[#717973] font-medium" x="78" y="112">May</text>
+<text class="text-[9px] fill-[#717973] font-medium" x="133" y="112">Jun</text>
+<text class="text-[9px] fill-[#717973] font-medium" x="189" y="112">Jul</text>
+<text class="text-[9px] fill-[#717973] font-medium" x="238" y="112">Aug</text>
+<text class="text-[9px] fill-[#717973] font-medium font-bold" x="288" y="112">Sep</text>
+</svg>
+</div>
+</div>
+<!-- Latest Assessment Domain Breakdown (Sep 2026) -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col space-y-3.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-[#e3f0e8] flex items-center justify-center text-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[17px]">assignment</span>
+</div>
+<h3 class="font-headline-sm text-[14.5px] font-bold text-on-surface">Latest Assessment <span class="font-normal text-on-surface-variant text-[12.5px]">(Sep 2026)</span></h3>
+</div>
+<button class="font-label-md text-secondary hover:text-primary transition-colors flex items-center gap-0.5 text-[11.5px] font-semibold">
+        View history
+        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</button>
+</div>
+<span class="font-label-sm text-on-surface-variant text-[10.5px] uppercase tracking-wider font-semibold">Domains (Relative Risk)</span>
+<!-- Progress Bars List -->
+<div class="space-y-2.5">
+<!-- Item 1: Mood & Emotional Wellbeing -->
+<div class="flex items-center justify-between gap-3 text-[12px]">
+<span class="text-on-surface font-medium min-w-[130px] text-[12px] truncate">Mood &amp; Emotional Wellbeing</span>
+<div class="flex-1 bg-surface-container-high h-2.5 rounded-full overflow-hidden flex items-center">
+<div class="bg-[#d96b5b] h-full rounded-full transition-all duration-500" style="width: 82%;"></div>
+</div>
+<span class="font-label-sm text-[#b42318] font-bold text-[11px] w-12 text-right">High</span>
+</div>
+<!-- Item 2: Workload Pressure -->
+<div class="flex items-center justify-between gap-3 text-[12px]">
+<span class="text-on-surface font-medium min-w-[130px] text-[12px] truncate">Workload Pressure</span>
+<div class="flex-1 bg-surface-container-high h-2.5 rounded-full overflow-hidden flex items-center">
+<div class="bg-[#e28c46] h-full rounded-full transition-all duration-500" style="width: 60%;"></div>
+</div>
+<span class="font-label-sm text-[#9e5d17] font-semibold text-[11px] w-12 text-right">Moderate</span>
+</div>
+<!-- Item 3: Sleep & Recovery -->
+<div class="flex items-center justify-between gap-3 text-[12px]">
+<span class="text-on-surface font-medium min-w-[130px] text-[12px] truncate">Sleep &amp; Recovery</span>
+<div class="flex-1 bg-surface-container-high h-2.5 rounded-full overflow-hidden flex items-center">
+<div class="bg-[#e49b38] h-full rounded-full transition-all duration-500" style="width: 52%;"></div>
+</div>
+<span class="font-label-sm text-[#9e5d17] font-semibold text-[11px] w-12 text-right">Moderate</span>
+</div>
+<!-- Item 4: Manager Relationship -->
+<div class="flex items-center justify-between gap-3 text-[12px]">
+<span class="text-on-surface font-medium min-w-[130px] text-[12px] truncate">Manager Relationship</span>
+<div class="flex-1 bg-surface-container-high h-2.5 rounded-full overflow-hidden flex items-center">
+<div class="bg-[#3e936b] h-full rounded-full transition-all duration-500" style="width: 24%;"></div>
+</div>
+<span class="font-label-sm text-secondary font-medium text-[11px] w-12 text-right">Low</span>
+</div>
+<!-- Item 5: Social Support -->
+<div class="flex items-center justify-between gap-3 text-[12px]">
+<span class="text-on-surface font-medium min-w-[130px] text-[12px] truncate">Social Support</span>
+<div class="flex-1 bg-surface-container-high h-2.5 rounded-full overflow-hidden flex items-center">
+<div class="bg-[#3e936b] h-full rounded-full transition-all duration-500" style="width: 22%;"></div>
+</div>
+<span class="font-label-sm text-secondary font-medium text-[11px] w-12 text-right">Low</span>
+</div>
+</div>
+</div>
+<!-- Predictive Factors & Clinical Model Context Grid -->
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Key Contributing Factors Card -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex flex-col">
+<div class="flex items-center gap-1.5 mb-2.5 text-primary">
+<span class="material-symbols-outlined text-[17px]">settings</span>
+<h4 class="font-headline-sm text-[12px] font-bold text-on-surface">Key Factors</h4>
+</div>
+<ul class="space-y-1.5 text-[11px] text-on-surface-variant font-normal leading-tight">
+<li class="flex items-start gap-1.5">
+<span class="text-primary font-bold">•</span>
+<span>Increased consecutive duty days</span>
+</li>
+<li class="flex items-start gap-1.5">
+<span class="text-primary font-bold">•</span>
+<span>Reduced leave utilisation</span>
+</li>
+<li class="flex items-start gap-1.5">
+<span class="text-primary font-bold">•</span>
+<span>Higher self-reported stress</span>
+</li>
+<li class="flex items-start gap-1.5">
+<span class="text-primary font-bold">•</span>
+<span>Recent deployment rotation</span>
+</li>
+</ul>
+</div>
+<!-- Model Context Card -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex flex-col">
+<div class="flex items-center gap-1.5 mb-2.5 text-secondary">
+<span class="material-symbols-outlined text-[17px]">account_tree</span>
+<h4 class="font-headline-sm text-[12px] font-bold text-on-surface">Model Context</h4>
+</div>
+<div class="space-y-2 text-[11px]">
+<div>
+<span class="text-on-surface-variant block text-[10px]">Model Version</span>
+<span class="font-code-md text-on-surface font-semibold text-[11.5px]">v1.4</span>
+</div>
+<div>
+<span class="text-on-surface-variant block text-[10px]">Confidence</span>
+<span class="font-body-sm text-on-surface font-semibold text-[11px] text-[#9e5d17]">Moderate (87%)</span>
+</div>
+<div>
+<span class="text-on-surface-variant block text-[10px]">Based on</span>
+<span class="font-body-sm text-on-surface-variant text-[10.5px] leading-tight block">Multi-factor analysis (HR + Assessment)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Recommended Supportive Actions (Welfare, Non-punitive) -->
+<div class="w-full bg-[#ebf4ef] rounded-xl p-4 shadow-sm flex flex-col space-y-3">
+<div class="flex items-start gap-2.5">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">volunteer_activism</span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-headline-sm text-[14px] font-bold text-on-surface">Recommended Supportive Actions</h3>
+<p class="font-body-sm text-on-surface-variant text-[11.5px] mt-0.5">These are welfare support actions. Not disciplinary.</p>
+</div>
+</div>
+<!-- Quick Action Buttons -->
+<div class="grid grid-cols-3 gap-2 pt-1">
+<!-- 1. Confidential Check-in -->
+<button class="bg-primary text-on-primary hover:bg-[#143527] active:scale-[0.98] transition-all rounded-lg p-2.5 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm min-h-[72px]">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="font-label-sm text-[10.5px] font-semibold leading-tight">Confidential Check-in</span>
+</button>
+<!-- 2. Counselling Referral -->
+<button class="bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-all active:scale-[0.98] rounded-lg p-2.5 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm min-h-[72px]">
+<span class="material-symbols-outlined text-primary text-[20px]">groups</span>
+<span class="font-label-sm text-[10.5px] font-semibold text-on-surface leading-tight">Counselling Referral</span>
+</button>
+<!-- 3. Welfare Follow-up -->
+<button class="bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-all active:scale-[0.98] rounded-lg p-2.5 flex flex-col items-center justify-center text-center gap-1.5 shadow-sm min-h-[72px]">
+<span class="material-symbols-outlined text-primary text-[20px]">fact_check</span>
+<span class="font-label-sm text-[10.5px] font-semibold text-on-surface leading-tight">Welfare Follow-up</span>
+</button>
+</div>
+</div>
+<!-- Privacy & Ethical Guardrail Footer -->
+<div class="w-full flex items-start gap-2.5 px-2 py-1">
+<span class="material-symbols-outlined text-outline text-[16px] mt-0.5 flex-shrink-0">lock</span>
+<p class="font-body-sm text-on-surface-variant text-[10.5px] leading-relaxed">
+      This is sensitive wellbeing information. Access is restricted to authorized welfare personnel only. Use only for welfare support purposes under organizational governance guidelines.
+    </p>
+</div>
+</div>
+<script>
+  // Simple tab click micro-interaction
+  const tabs = document.querySelectorAll('#tab-overview, #tab-assessments, #tab-trends, #tab-model');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => {
+        t.classList.remove('text-primary');
+        t.classList.add('text-on-surface-variant');
+        const underline = t.querySelector('span.h-\\[2\\.5px\\]');
+        if (underline) underline.remove();
+      });
+      tab.classList.remove('text-on-surface-variant');
+      tab.classList.add('text-primary');
+      const bar = document.createElement('span');
+      bar.className = 'absolute bottom-0 left-0 right-0 h-[2.5px] bg-primary rounded-full';
+      tab.classList.add('relative');
+      tab.appendChild(bar);
+    });
+  });
+</script></main></body></html>

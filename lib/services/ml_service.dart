@@ -4,10 +4,21 @@ import 'dart:developer' as dev;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/ml_models.dart';
+
+/// Thrown by [MlService.scoreBatch] in strict mode when the live model service
+/// cannot be reached, so callers can show an explicit "start the ML service"
+/// state instead of silently degrading to heuristics.
+class MlServiceUnavailable implements Exception {
+  MlServiceUnavailable(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
 
 /// Client for the ManoFit Analytics & ML microservice (FastAPI, port 8000).
 ///
@@ -46,11 +57,15 @@ class MlService extends ChangeNotifier {
   /// Android emulator; a USB-attached handset reaches the laptop through
   /// `adb reverse tcp:8000 tcp:8000`, which makes `localhost` resolve.
   List<String> get _candidateHosts {
-    if (kIsWeb) return const ['http://localhost:8000'];
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return const ['http://10.0.2.2:8000', 'http://localhost:8000'];
-    }
-    return const ['http://localhost:8000', 'http://127.0.0.1:8000'];
+    final env = dotenv.maybeGet('ML_URL')?.trim();
+    final envClean = (env != null && env.isNotEmpty) ? env.replaceAll(RegExp(r'/+$'), '') : null;
+    return [
+      if (envClean != null) envClean,
+      if (kIsWeb) 'http://localhost:8000',
+      if (defaultTargetPlatform == TargetPlatform.android) ...['http://10.0.2.2:8000', 'http://localhost:8000'],
+      'http://localhost:8000',
+      'http://127.0.0.1:8000',
+    ];
   }
 
   Map<String, String> get _headers => {
@@ -58,17 +73,42 @@ class MlService extends ChangeNotifier {
         'Authorization': 'Bearer $_token',
       };
 
-  Future<void> init() async {
+  Future<void> init({String? remoteEndpoint}) async {
+    final env = dotenv.maybeGet('ML_URL')?.trim();
+    final envClean = (env != null && env.isNotEmpty) ? env.replaceAll(RegExp(r'/+$'), '') : null;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedUrl = prefs.getString(keyBaseUrl);
+      final savedUrl = prefs.getString(keyBaseUrl)?.trim();
       _token = prefs.getString(keyToken) ?? defaultToken;
-      if (savedUrl != null && savedUrl.isNotEmpty) _baseUrl = savedUrl;
+
+      // Priority:
+      // 1. remoteEndpoint from Supabase (if available)
+      // 2. saved override from SharedPreferences (if explicitly set)
+      // 3. ML_URL from .env
+      if (remoteEndpoint != null && remoteEndpoint.trim().isNotEmpty) {
+        _baseUrl = remoteEndpoint.trim().replaceAll(RegExp(r'/+$'), '');
+      } else if (savedUrl != null && savedUrl.isNotEmpty) {
+        _baseUrl = savedUrl.replaceAll(RegExp(r'/+$'), '');
+      } else if (envClean != null) {
+        _baseUrl = envClean;
+      }
     } catch (e) {
       dev.log('ManoFit ML: could not read saved settings: $e');
     }
     await checkHealth();
   }
+
+  /// Adopts a remote endpoint discovered from Supabase at runtime.
+  Future<void> syncFromSupabase(String url) async {
+    final clean = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (clean.isNotEmpty && clean != _baseUrl) {
+      dev.log('ManoFit ML: adopting Supabase endpoint: $clean');
+      _baseUrl = clean;
+      await checkHealth();
+    }
+  }
+
 
   /// Probes candidate hosts until one answers `/health`, then caches it.
   Future<bool> checkHealth() async {
@@ -206,8 +246,14 @@ class MlService extends ChangeNotifier {
   // -------------------------------------------------------------------
 
   /// Batch-scores a pseudonymized cohort for the HR / Welfare analytics board.
+  ///
+  /// When [strict] is true the live microservice is the only accepted source:
+  /// any failure throws [MlServiceUnavailable] instead of substituting the
+  /// on-device heuristic, so the HR board never renders numbers the real model
+  /// did not produce.
   Future<BatchRiskResult> scoreBatch(
-      List<Map<String, dynamic>> items) async {
+      List<Map<String, dynamic>> items,
+      {bool strict = false}) async {
     try {
       final res = await http
           .post(
@@ -222,9 +268,19 @@ class MlService extends ChangeNotifier {
             jsonDecode(res.body) as Map<String, dynamic>);
       }
       dev.log('ManoFit ML: batch scoring HTTP ${res.statusCode}: ${res.body}');
+      if (strict) {
+        throw MlServiceUnavailable(
+            'Model service returned HTTP ${res.statusCode}.');
+      }
+    } on MlServiceUnavailable {
+      rethrow;
     } catch (e) {
-      dev.log('ManoFit ML: batch endpoint unreachable, falling back: $e');
+      dev.log('ManoFit ML: batch endpoint unreachable: $e');
       _markOffline();
+      if (strict) {
+        throw MlServiceUnavailable(
+            'Model service is unreachable at $baseUrl.');
+      }
     }
     return _fallbackBatch(items);
   }
@@ -351,7 +407,7 @@ class MlService extends ChangeNotifier {
     if (lower.contains('sleep') || lower.contains('night')) {
       return 'Rest is the foundation of endurance. Disrupted sleep can '
           'increase cognitive strain. Let us try easing the rhythm with calming '
-          'breathing in the Self-Help section.';
+          'breathing in the Mindfulness section.';
     }
     return 'Thank you for sharing that with me. I am here to listen anytime in '
         'complete confidence. What is on your mind today?';

@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({super.key});
@@ -64,7 +63,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

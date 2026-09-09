@@ -1,151 +1,140 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
+import '../data/assessment_cadence.dart';
+import '../data/wellbeing_checkins.dart';
 import '../services/db_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
+/// The private check-ins (PRD §7). Direct "wellness survey data" input to the
+/// analytics layer — one item per page, 1–5 scale, nothing scored back to the
+/// user. Which items are asked depends on the [cadence].
 class WellbeingCheckInScreen extends StatefulWidget {
-  const WellbeingCheckInScreen({super.key});
+  const WellbeingCheckInScreen({super.key, this.cadence = CheckInCadence.weekly});
+
+  final CheckInCadence cadence;
 
   @override
   State<WellbeingCheckInScreen> createState() => _WellbeingCheckInScreenState();
 }
 
 class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
-  int _currentIndex = 2; // Question 3 by default per reference design
-  final Map<int, int> _answers = {
-    0: 0, // Not at all
-    1: 1, // Several days
-    2: 1, // Several days (preselected per stitch)
-  };
   final _db = DbService();
+  int _index = 0;
+  final Map<String, int> _answers = {};
   bool _submitting = false;
 
-  final List<String> _questions = [
-    'Little interest or pleasure in doing daily operational tasks or hobbies?',
-    'Feeling down, depressed, or fatigued after continuous duty rotations?',
-    'In the past two weeks, how often have you felt restless or on edge?',
-    'Trouble falling or staying asleep, or sleeping too much during rest cycles?',
-    'Feeling tired or having little energy during deployment shifts?',
-    'Poor appetite or overeating during prolonged outpost postings?',
-    'Trouble concentrating on instructions, communications, or routine details?',
-    'Feeling nervous, anxious, or unable to stop or control worrying?',
-    'Worrying too much about different personal or organizational matters?',
-    'Becoming easily annoyed or irritable around peers or unit members?',
-  ];
+  List<CheckInItem> get _items => widget.cadence.items;
+  CheckInItem get _item => _items[_index];
+  int? get _selected => _answers[_item.key];
+  bool get _isLast => _index == _items.length - 1;
 
-  final List<Map<String, dynamic>> _options = [
-    {'text': 'Not at all', 'score': 0},
-    {'text': 'Several days', 'score': 1},
-    {'text': 'More than half the days', 'score': 2},
-    {'text': 'Nearly every day', 'score': 3},
-  ];
-
-  Future<void> _completeAssessment() async {
+  Future<void> _submit() async {
     setState(() => _submitting = true);
-
-    int totalScore = 0;
-    final Map<String, dynamic> formattedAnswers = {};
-    _answers.forEach((qIndex, score) {
-      totalScore += score;
-      formattedAnswers['q${qIndex + 1}'] = {
-        'question': _questions[qIndex],
-        'score': score,
-      };
-    });
-
-    await _db.recordAssessment(
-      totalScore: totalScore,
-      answers: formattedAnswers,
-    );
-
+    final ok = await _db.recordWellbeingCheckIn(_answers, cadence: widget.cadence.id);
+    if (!mounted) return;
     setState(() => _submitting = false);
 
-    if (mounted) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: AppColors.surface,
-          title: const Row(
-            children: [
-              Icon(Icons.shield_outlined, color: AppColors.secondary),
-              SizedBox(width: 8),
-              Text('Assessment Complete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Total Score: $totalScore / 30',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Your survey data is pseudonymized and stored securely in accordance with DPDP Act 2023. It will feed the predictive welfare model without exposing your raw inputs to commanders.',
-                style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryContainer,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-                context.go('/home');
-              },
-              child: const Text('Back to Home'),
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppColors.surface,
+        title: const Row(
+          children: [
+            Icon(Icons.verified_user_outlined, color: AppColors.secondary),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text('Check-in recorded',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             ),
           ],
         ),
-      );
-    }
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${widget.cadence.title} saved — ${_items.length} of ${_items.length} answered.',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: AppColors.primary),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Your answers are pseudonymized before they reach the welfare analytics layer. '
+              'Your commander cannot see them, and no individual score or flag is ever shown '
+              'back to you or to the chain of command.',
+              style:
+                  TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+            ),
+            if (!ok) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'Saved on this device — it will sync when the connection is restored.',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryContainer,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.backOr('/checkins');
+            },
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_currentIndex + 1) / _questions.length;
-    final currentScore = _answers[_currentIndex] ?? 0;
+    final progress = (_index + 1) / _items.length;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.backOr('/home'),
         ),
-        title: const Text('Active Assessment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        actions: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.person, size: 16, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-        ],
+        title: Text(widget.cadence.title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Progress Bar
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('QUESTION PROGRESS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: AppColors.onSurfaceVariant)),
-                  Text(
-                    '${_currentIndex + 1} of ${_questions.length}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primaryContainer),
-                  ),
+                  const Text('CHECK-IN PROGRESS',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: AppColors.onSurfaceVariant)),
+                  Text('${_index + 1} of ${_items.length}',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryContainer)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -154,36 +143,40 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                 child: LinearProgressIndicator(
                   value: progress,
                   backgroundColor: AppColors.surfaceContainerHigh,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryContainer),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.primaryContainer),
                   minHeight: 6,
                 ),
               ),
               const SizedBox(height: 18),
 
-              // Category Pill
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.secondaryContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.shield, size: 14, color: AppColors.onSecondaryContainer),
-                    SizedBox(width: 4),
-                    Text(
-                      'Personal Wellbeing Assessment',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onSecondaryContainer),
+                    Icon(_item.icon,
+                        size: 14, color: AppColors.onSecondaryContainer),
+                    const SizedBox(width: 4),
+                    const Flexible(
+                      child: Text('Private — not visible to your unit',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.onSecondaryContainer)),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
 
-              // Question Heading
               Text(
-                _questions[_currentIndex],
+                _item.question,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
@@ -191,80 +184,34 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                     ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Select the option that best describes your operational or daily experience.',
-                style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+              Text(
+                _item.helper,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.onSurfaceVariant),
               ),
               const SizedBox(height: 24),
 
-              // Multiple Choice Options
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _options.length,
-                itemBuilder: (context, index) {
-                  final opt = _options[index];
-                  final isSelected = currentScore == opt['score'];
+              for (var i = 0; i < _item.labels.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _optionTile(value: i + 1, label: _item.labels[i]),
+                ),
+              const SizedBox(height: 20),
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Material(
-                      color: isSelected ? AppColors.secondaryFixed.withOpacity(0.35) : AppColors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(14),
-                      elevation: isSelected ? 0 : 1,
-                      shadowColor: Colors.black.withOpacity(0.04),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () {
-                          setState(() {
-                            _answers[_currentIndex] = opt['score'] as int;
-                          });
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                opt['text'] as String,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                  color: isSelected ? AppColors.primaryContainer : AppColors.onSurface,
-                                ),
-                              ),
-                              Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerHigh,
-                                ),
-                                child: isSelected
-                                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-
-              // Bottom Navigation Buttons
               Row(
                 children: [
-                  if (_currentIndex > 0) ...[
+                  if (_index > 0) ...[
                     OutlinedButton(
-                      onPressed: () => setState(() => _currentIndex--),
+                      onPressed: () => setState(() => _index--),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.outlineVariant),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        side:
+                            const BorderSide(color: AppColors.outlineVariant),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                        minimumSize: Size.zero,
                       ),
                       child: const Text('Previous'),
                     ),
@@ -272,35 +219,109 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                   ],
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (_currentIndex < _questions.length - 1) {
-                          setState(() => _currentIndex++);
-                        } else {
-                          _completeAssessment();
-                        }
-                      },
+                      onPressed: (_selected == null || _submitting)
+                          ? null
+                          : () {
+                              if (_isLast) {
+                                _submit();
+                              } else {
+                                setState(() => _index++);
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryContainer,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 14),
+                        minimumSize: Size.zero,
                       ),
                       child: _submitting
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
                           : Row(
+                              mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  _currentIndex == _questions.length - 1 ? 'Submit Assessment' : 'Next Question',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                Flexible(
+                                  child: Text(
+                                    _isLast ? 'Submit Check-in' : 'Next',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15),
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Icon(Icons.arrow_forward_rounded, size: 18),
+                                const Icon(Icons.arrow_forward_rounded,
+                                    size: 18),
                               ],
                             ),
                     ),
                   ),
                 ],
+              ),
+              if (_selected == null) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Choose the option that fits best to continue.',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _optionTile({required int value, required String label}) {
+    final isSelected = _selected == value;
+    return Material(
+      color: isSelected
+          ? AppColors.secondaryFixed.withOpacity(0.35)
+          : AppColors.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(14),
+      elevation: isSelected ? 0 : 1,
+      shadowColor: Colors.black.withOpacity(0.04),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _answers[_item.key] = value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected
+                        ? AppColors.primaryContainer
+                        : AppColors.onSurface,
+                  ),
+                ),
+              ),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected
+                      ? AppColors.primaryContainer
+                      : AppColors.surfaceContainerHigh,
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    : null,
               ),
             ],
           ),

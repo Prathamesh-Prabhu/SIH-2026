@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 import '../widgets/supabase_settings_dialog.dart';
 
 class InstitutionalResilienceScreen extends StatelessWidget {
@@ -15,7 +14,6 @@ class InstitutionalResilienceScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F6),
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         backgroundColor: Colors.white,
         title: Row(
@@ -48,7 +46,7 @@ class InstitutionalResilienceScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.black54),
             tooltip: 'Exit to Home',
-            onPressed: () => context.go('/home'),
+            onPressed: () => context.backOr(),
           ),
           const SizedBox(width: 8),
         ],

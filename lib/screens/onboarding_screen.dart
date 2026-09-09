@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme/app_theme.dart';
+import '../core/auth/role_access.dart';
 import '../services/auth_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,22 +17,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _wearableSync = false;
   bool _anonymizedResearch = true;
 
-  void _completeOnboarding() {
-    _auth.updateConsent({
+  Future<void> _completeOnboarding() async {
+    await _auth.updateConsent({
       'mandatory_hr_sync': true,
       'optional_wearable_sync': _wearableSync,
       'companion_memory': _companionMemory,
       'anonymized_research': _anonymizedResearch,
     });
-    context.go('/home');
+    await _auth.markOnboardingComplete();
+    if (mounted) context.go(AuthService().currentRole.homeRoute);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Confidentiality Charter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
           TextButton(
@@ -137,8 +138,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     const SizedBox(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('AI Companion Reflection Memory', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('Enables empathetic continuity across sessions. Stored locally/encrypted.', style: TextStyle(fontSize: 11)),
+                      title: const Text('Tara Conversation Memory', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Lets Tara keep empathetic continuity across sessions. Stored locally/encrypted.', style: TextStyle(fontSize: 11)),
                       activeColor: AppColors.secondary,
                       value: _companionMemory,
                       onChanged: (v) => setState(() => _companionMemory = v),

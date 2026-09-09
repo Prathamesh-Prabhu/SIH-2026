@@ -138,6 +138,19 @@ class UserProfile {
     stressZone: 'Optimal',
   );
 
+  static final UserProfile oversightAudit = UserProfile(
+    id: 'usr-oversight-01',
+    serviceId: 'OVERSIGHT-01',
+    fullName: 'Oversight Board Member',
+    rank: 'Ethics & Oversight Board',
+    unit: 'Independent Review Panel',
+    role: UserRole.oversightBoard,
+    phone: '+91 96444 55667',
+    streakCount: 0,
+    readinessScore: 0,
+    stressZone: 'N/A',
+  );
+
   static final UserProfile raoCommander = UserProfile(
     id: 'usr-rao-cmd',
     serviceId: 'CMD-UNIT-42',

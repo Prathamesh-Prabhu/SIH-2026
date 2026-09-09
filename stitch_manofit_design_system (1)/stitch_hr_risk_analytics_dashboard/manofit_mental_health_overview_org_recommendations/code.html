@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ManoFit Welfare Platform</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#f3fbf6;}body{overscroll-behavior-y:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-variant": "#dce4e0", "on-secondary": "#ffffff", "tertiary-fixed-dim": "#79d4e2", "on-secondary-fixed-variant": "#0e5138", "outline-variant": "#c1c8c2", "on-tertiary-fixed-variant": "#004f57", "tertiary-container": "#00434a", "surface-container": "#e7f0eb", "surface-container-high": "#e2eae5", "on-tertiary": "#ffffff", "on-error-container": "#93000a", "surface": "#f3fbf6", "on-secondary-fixed": "#002114", "tertiary-fixed": "#95f1ff", "secondary-fixed-dim": "#95d4b3", "on-tertiary-container": "#56b4c1", "surface-tint": "#3f6653", "secondary-container": "#aeeecb", "on-error": "#ffffff", "inverse-on-surface": "#eaf3ee", "on-surface-variant": "#414844", "on-primary-fixed": "#002114", "on-primary-container": "#86af99", "on-primary-fixed-variant": "#274e3d", "surface-bright": "#f3fbf6", "error-container": "#ffdad6", "on-surface": "#151d1a", "background": "#f3fbf6", "secondary": "#2c694e", "error": "#ba1a1a", "outline": "#717973", "tertiary": "#002b31", "surface-container-highest": "#dce4e0", "primary-fixed-dim": "#a5d0b9", "primary-fixed": "#c1ecd4", "on-primary": "#ffffff", "primary-container": "#1b4332", "on-tertiary-fixed": "#001f24", "inverse-surface": "#2a322f", "surface-container-low": "#edf6f1", "surface-container-lowest": "#ffffff", "on-background": "#151d1a", "secondary-fixed": "#b1f0ce", "on-secondary-container": "#316e52", "inverse-primary": "#a5d0b9", "primary": "#012d1d", "surface-dim": "#d4dcd7" }, borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, spacing: { "space-md": "0.75rem", "col-gutter": "0.75rem", "space-2xl": "2rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-xl": "1.5rem", "space-3xl": "3rem", "space-xxs": "0.125rem", "panel-padding-compact": "0.75rem", "panel-padding-standard": "1.25rem", "space-base": "1rem", "space-lg": "1.25rem" }, fontFamily: { "headline-sm": ["Inter"], "headline-lg": ["Inter"], "code-md": ["Inter"], "label-lg": ["Inter"], "display-lg": ["Inter"], "body-lg": ["Inter"], "headline-md": ["Inter"], "body-md": ["Inter"], "label-sm": ["Inter"], "body-sm": ["Inter"], "label-md": ["Inter"], "display-md": ["Inter"] }, fontSize: { "headline-sm": ["15px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "600" }], "headline-lg": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "code-md": ["12px", { "lineHeight": "16px", "letterSpacing": "-0.01em", "fontWeight": "500" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }], "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "headline-md": ["18px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "body-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600" }], "display-md": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "700" }] } } } }</script></head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen selection:bg-secondary-container selection:text-on-secondary-container"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-space-base flex items-center justify-between"><div class="flex items-center gap-space-sm min-w-0"><img alt="Brand logo. - Primary color: #1b4332
+- Font: inter
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6z3doX3YcvHNuZUe1Yo4AHubQglUyU_ehOusQ1lPlRfvpJKv3p57xVgdyXurXGjVM8FBi-J147t2fYLW8b31ouqE_AhcsC3f49Jnikbk82dBuqaazz5jP2UEDBy15xiwa_pjJEsFGAFefulWVKQgycIhowSCkw29gydul8wAZLp57ofT2vvm2D0Oz1w3YiwnspQhsyaq_Ge0m2qnq3YHFj8aZmH-GqlTG8QQEL8uCNnN28aH5z8Redw"/><div class="flex flex-col min-w-0"><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight truncate">ManoFit</span><span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-primary-container text-on-primary uppercase tracking-wider">SECURE</span></div><span class="font-label-sm text-label-sm text-on-surface-variant truncate uppercase">Admin / Welfare Officer</span></div></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Alerts" class="w-11 h-11 relative flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2 right-2 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-error text-on-error font-label-sm text-[9px] leading-none font-bold">3</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-space-xxs"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 w-full bg-surface pt-16 pb-24 px-space-base"><div class="flex flex-col w-full space-y-space-base">
+<!-- Subtle Hero Banner with Atmospheric Silhouette -->
+<section class="relative w-full rounded-xl overflow-hidden bg-gradient-to-b from-surface-container-low via-surface-container-lowest to-surface-container-low shadow-sm p-space-base">
+<div class="flex items-start justify-between relative z-10">
+<div class="flex flex-col max-w-[70%]">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight font-bold">
+          Building a Healthier Force
+        </h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5 font-medium">
+          People. Preparedness. Purpose.
+        </p>
+</div>
+<div class="flex flex-col items-end text-right">
+<span class="font-label-sm text-[8px] uppercase tracking-wider text-secondary font-bold leading-tight">
+          WELL PEOPLE<br/>STRONGER<br/>TOMORROW
+        </span>
+</div>
+</div>
+<!-- Atmospheric Silhouette Mountain Artwork -->
+<div class="relative w-full h-16 mt-2 flex items-end justify-end pointer-events-none opacity-80">
+<svg class="w-full h-16 overflow-visible" fill="none" preserveaspectratio="none" viewbox="0 0 340 70">
+<circle cx="285" cy="22" fill="#FFE8B5" opacity="0.9" r="14"></circle>
+<path d="M0 65 Q 90 40 180 55 T 340 45 L 340 70 L 0 70 Z" fill="#E2EAE5" opacity="0.6"></path>
+<path d="M120 70 Q 210 46 270 56 T 340 50 L 340 70 Z" fill="#C1ECD4" opacity="0.45"></path>
+<!-- Personnel Walking Silhouettes -->
+<g fill="#1B4332" opacity="0.85">
+<!-- Person 1 -->
+<circle cx="242" cy="42" r="2.2"></circle>
+<path d="M241 45 h2 v8 h-1 v5 h-1 v-5 h-0.5 Z"></path>
+<path d="M243 46 l2 5" stroke="#1B4332" stroke-linecap="round" stroke-width="0.8"></path>
+<!-- Person 2 with patrol gear -->
+<circle cx="249" cy="40" r="2.2"></circle>
+<path d="M247.5 43.5 h3 v9 h-1.2 v6 h-1 v-6 h-0.8 Z"></path>
+<path d="M246 45 l3 3" stroke="#1B4332" stroke-linecap="round" stroke-width="0.8"></path>
+<!-- Person 3 -->
+<circle cx="256" cy="41" r="2.2"></circle>
+<path d="M254.5 44 h3 v8.5 h-1.2 v5.5 h-1 v-5.5 h-0.8 Z"></path>
+<!-- Person 4 -->
+<circle cx="263" cy="39" r="2.2"></circle>
+<path d="M261.5 42 h3 v9.5 h-1.2 v6.5 h-1 v-6.5 h-0.8 Z"></path>
+</g>
+</svg>
+</div>
+</section>
+<!-- Active High-Priority Mental Health Alerts Banner -->
+<a aria-label="Review active welfare alerts" class="group block w-full rounded-xl bg-error-container/60 hover:bg-error-container transition-all p-space-md shadow-sm" href="#" role="button">
+<div class="flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-lg bg-error/15 flex items-center justify-center flex-shrink-0 text-error">
+<span class="material-symbols-outlined text-[24px]">warning</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold truncate">Active Alerts</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">
+            Personnel needing welfare attention (across all units)
+          </span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 flex-shrink-0">
+<div class="text-right">
+<div class="font-display-md text-display-md text-on-surface leading-none font-bold">12</div>
+<div class="font-label-sm text-[10px] text-error font-bold whitespace-nowrap mt-0.5">3 high priority</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-0.5 transition-transform text-[20px]">chevron_right</span>
+</div>
+</div>
+</a>
+<!-- Wellbeing & Mental Health Risk Distribution Card -->
+<section class="w-full rounded-xl bg-surface-container-lowest p-space-base shadow-sm">
+<div class="flex items-center justify-between mb-space-base">
+<div class="flex items-center gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Wellbeing Risk Distribution</h2>
+<button class="text-on-surface-variant hover:text-on-surface" title="Distribution calculates 30-day aggregate psychological readiness indices" type="button">
+<span class="material-symbols-outlined text-[16px]">info</span>
+</button>
+</div>
+<button class="flex items-center gap-0.5 px-2 py-1 rounded bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors" type="button">
+<span>Current Period</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+<div class="flex items-center justify-between gap-space-base">
+<!-- Donut Chart -->
+<div class="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
+<svg class="w-36 h-36 -rotate-90" viewbox="0 0 120 120">
+<!-- Background circle track -->
+<circle cx="60" cy="60" fill="none" r="46" stroke="#e7f0eb" stroke-width="16"></circle>
+<!-- Low Risk (72% -> 208.5 perimeter) -->
+<circle cx="60" cy="60" fill="none" r="46" stroke="#2c694e" stroke-dasharray="289" stroke-dashoffset="81" stroke-linecap="butt" stroke-width="16"></circle>
+<!-- Moderate Risk (20% -> 57.8 perimeter) offset at 289-81 = 208.2 -->
+<circle cx="60" cy="60" fill="none" r="46" stroke="#e0a338" stroke-dasharray="57.8 231.2" stroke-dashoffset="-208" stroke-linecap="butt" stroke-width="16"></circle>
+<!-- Elevated Risk (8% -> 23.1 perimeter) -->
+<circle cx="60" cy="60" fill="none" r="46" stroke="#e06a55" stroke-dasharray="23.1 265.9" stroke-dashoffset="-266" stroke-linecap="butt" stroke-width="16"></circle>
+</svg>
+<div class="absolute flex flex-col items-center justify-center text-center pointer-events-none">
+<span class="font-headline-md text-headline-md font-bold text-on-surface leading-tight">1,248</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">Personnel</span>
+</div>
+</div>
+<!-- Legend Breakdown -->
+<div class="flex-1 flex flex-col justify-center space-y-2.5 min-w-0">
+<!-- Low Risk Item -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary flex-shrink-0"></span>
+<span class="font-body-md text-body-md text-on-surface font-medium truncate">Low Risk</span>
+</div>
+<div class="text-right flex items-baseline gap-1 flex-shrink-0">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">72%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(898)</span>
+</div>
+</div>
+<!-- Moderate Risk Item -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-[#e0a338] flex-shrink-0"></span>
+<span class="font-body-md text-body-md text-on-surface font-medium truncate">Moderate Risk</span>
+</div>
+<div class="text-right flex items-baseline gap-1 flex-shrink-0">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">20%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(249)</span>
+</div>
+</div>
+<!-- Elevated Risk Item -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-[#e06a55] flex-shrink-0"></span>
+<span class="font-body-md text-body-md text-on-surface font-medium truncate">Elevated Risk</span>
+</div>
+<div class="text-right flex items-baseline gap-1 flex-shrink-0">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">8%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(101)</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Assessment Engagement & Freshness Telemetry Pair -->
+<section class="grid grid-cols-2 gap-space-sm w-full">
+<!-- Card A: Assessment Coverage -->
+<div class="w-full rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-1.5 text-on-surface-variant mb-1">
+<span class="material-symbols-outlined text-[18px]">groups</span>
+<span class="font-label-md text-label-md truncate">Assessment Coverage</span>
+</div>
+<div class="font-display-md text-display-md text-on-surface font-bold leading-tight mb-2">
+          78%
+        </div>
+<!-- Progress Bar -->
+<div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden mb-2">
+<div class="h-full bg-secondary rounded-full" style="width: 78%;"></div>
+</div>
+</div>
+<a class="flex items-center justify-between text-on-surface-variant hover:text-on-surface transition-colors pt-1" href="#">
+<span class="font-body-sm text-[11px] font-medium truncate">972 of 1,248 eligible</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</a>
+</div>
+<!-- Card B: Last Assessment Run -->
+<div class="w-full rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-1.5 text-on-surface-variant mb-1">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span class="font-label-md text-label-md truncate">Last Assessment Run</span>
+</div>
+<div class="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">
+          08 Sep 2026
+        </div>
+<div class="font-body-sm text-[11px] text-on-surface-variant mb-2">
+          18:30 IST
+        </div>
+<div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[10px] font-semibold w-max">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>Data Fresh</span>
+</div>
+</div>
+<a class="flex items-center justify-between text-on-surface-variant hover:text-on-surface transition-colors pt-2" href="#">
+<span class="font-body-sm text-[11px] font-medium">Model v1.4</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</a>
+</div>
+</section>
+<!-- Multi-Month Wellbeing Trend (All Units) -->
+<section class="w-full rounded-xl bg-surface-container-lowest p-space-base shadow-sm">
+<div class="flex items-center justify-between mb-space-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">
+        Wellbeing Trend <span class="font-body-sm text-body-sm text-on-surface-variant font-normal">(All Units)</span>
+</h2>
+<button class="flex items-center gap-0.5 px-2 py-1 rounded bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors" type="button">
+<span>Last 6 Months</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+<!-- Trend Legend -->
+<div class="flex items-center justify-center gap-4 py-1 mb-2">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Low</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#e0a338]"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Moderate</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#e06a55]"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Elevated</span>
+</div>
+</div>
+<!-- Multi-Line Chart (Apr - Sep) -->
+<div class="w-full relative pt-1">
+<svg class="w-full h-36" preserveaspectratio="none" viewbox="0 0 320 120">
+<!-- Horizontal Grid Lines -->
+<line stroke="#E2EAE5" stroke-dasharray="2 2" stroke-width="0.8" x1="30" x2="315" y1="15" y2="15"></line>
+<line stroke="#E2EAE5" stroke-dasharray="2 2" stroke-width="0.8" x1="30" x2="315" y1="55" y2="55"></line>
+<line stroke="#E2EAE5" stroke-dasharray="2 2" stroke-width="0.8" x1="30" x2="315" y1="95" y2="95"></line>
+<!-- Y Axis Labels -->
+<text fill="#717973" font-family="Inter" font-size="8" x="5" y="18">100%</text>
+<text fill="#717973" font-family="Inter" font-size="8" x="10" y="58">50%</text>
+<text fill="#717973" font-family="Inter" font-size="8" x="15" y="98">0%</text>
+<!-- X Coordinates: Apr=45, May=95, Jun=145, Jul=195, Aug=245, Sep=295 -->
+<!-- Low Risk Trend Line (~70% - 75%) : Y = 95 - (val * 0.8) => ~36 to ~32 -->
+<polyline fill="none" points="45,39 95,44 145,41 195,33 245,30 295,34" stroke="#2c694e" stroke-linejoin="round" stroke-width="2"></polyline>
+<circle cx="45" cy="39" fill="#2c694e" r="2.5"></circle>
+<circle cx="95" cy="44" fill="#2c694e" r="2.5"></circle>
+<circle cx="145" cy="41" fill="#2c694e" r="2.5"></circle>
+<circle cx="195" cy="33" fill="#2c694e" r="2.5"></circle>
+<circle cx="245" cy="30" fill="#2c694e" r="2.5"></circle>
+<circle cx="295" cy="34" fill="#2c694e" r="2.5"></circle>
+<!-- Moderate Risk Trend Line (~20%) : Y around 77 - 74 -->
+<polyline fill="none" points="45,76 95,78 145,75 195,74 245,73 295,74" stroke="#e0a338" stroke-linejoin="round" stroke-width="1.8"></polyline>
+<circle cx="45" cy="76" fill="#e0a338" r="2.5"></circle>
+<circle cx="95" cy="78" fill="#e0a338" r="2.5"></circle>
+<circle cx="145" cy="75" fill="#e0a338" r="2.5"></circle>
+<circle cx="195" cy="74" fill="#e0a338" r="2.5"></circle>
+<circle cx="245" cy="73" fill="#e0a338" r="2.5"></circle>
+<circle cx="295" cy="74" fill="#e0a338" r="2.5"></circle>
+<!-- Elevated Risk Trend Line (~8%) : Y around 88 - 87 -->
+<polyline fill="none" points="45,88 95,88 145,87 195,87 245,87 295,86" stroke="#e06a55" stroke-linejoin="round" stroke-width="1.8"></polyline>
+<circle cx="45" cy="88" fill="#e06a55" r="2.5"></circle>
+<circle cx="95" cy="88" fill="#e06a55" r="2.5"></circle>
+<circle cx="145" cy="87" fill="#e06a55" r="2.5"></circle>
+<circle cx="195" cy="87" fill="#e06a55" r="2.5"></circle>
+<circle cx="245" cy="87" fill="#e06a55" r="2.5"></circle>
+<circle cx="295" cy="86" fill="#e06a55" r="2.5"></circle>
+<!-- X Axis Labels -->
+<text fill="#717973" font-family="Inter" font-size="9" x="37" y="112">Apr</text>
+<text fill="#717973" font-family="Inter" font-size="9" x="86" y="112">May</text>
+<text fill="#717973" font-family="Inter" font-size="9" x="136" y="112">Jun</text>
+<text fill="#717973" font-family="Inter" font-size="9" x="188" y="112">Jul</text>
+<text fill="#717973" font-family="Inter" font-size="9" x="236" y="112">Aug</text>
+<text fill="#717973" font-family="Inter" font-size="9" x="286" y="112">Sep</text>
+</svg>
+</div>
+</section>
+<!-- Organisation Welfare Recommendations Section (Actionable & Non-Disciplinary) -->
+<section class="w-full space-y-space-sm pb-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[20px] text-[#e0a338]">lightbulb</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Organisation Recommendations</h2>
+</div>
+<a class="font-label-md text-label-md text-secondary font-bold flex items-center hover:text-primary transition-colors" href="#">
+<span>View all</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</a>
+</div>
+<!-- Recommendation Cards (Dual Grid) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm">
+<!-- Card 1: Roster / Rest Review -->
+<div class="w-full rounded-xl bg-surface-container-lowest p-space-md shadow-sm hover:shadow-md transition-all flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">energy_savings_leaf</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold mb-0.5 truncate">
+            Roster / Rest Review
+          </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+            Increase rest period review for units with rising workload indicators and sustained field rotations.
+          </p>
+</div>
+</div>
+<!-- Card 2: Voluntary Check-in Campaign -->
+<div class="w-full rounded-xl bg-surface-container-lowest p-space-md shadow-sm hover:shadow-md transition-all flex items-start gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center text-secondary flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">diversity_1</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold mb-0.5 truncate">
+            Voluntary Check-in Campaign
+          </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+            Run a unit-level mental wellbeing check-in campaign with confidential wellness officer touchpoints.
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Non-Disciplinary Compliance Assurance Footnote -->
+<div class="w-full rounded-lg bg-surface-container-low p-space-sm flex items-center gap-space-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-secondary flex-shrink-0">verified_user</span>
+<span class="font-body-sm text-[11px] leading-tight">
+      Data is strictly pseudonymised and managed under Institutional Welfare Governance protocol. Analytics are supportive, preventative, and non-disciplinary.
+    </span>
+</div>
+</div>
+<script>
+  // Micro-interaction for filter selectors & alert tap responsiveness
+  document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      btn.classList.add('scale-[0.98]');
+      setTimeout(() => btn.classList.remove('scale-[0.98]'), 120);
+    });
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-1px_8px_rgba(0,0,0,0.04)]" data-active-classes="text-primary font-bold"><div class="flex items-center justify-around h-16 px-space-xs"><a aria-current="page" class="flex-1 flex flex-col items-center justify-center min-h-[44px] py-1 transition-colors text-primary font-bold" data-path="home" href="#"><span class="material-symbols-outlined text-[20px]">grid_view</span><span class="font-label-sm text-label-sm tracking-normal mt-0.5">Home</span></a><a class="flex-1 flex flex-col items-center justify-center min-h-[44px] py-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="analytics" href="#"><span class="material-symbols-outlined text-[20px]">monitoring</span><span class="font-label-sm text-label-sm tracking-normal mt-0.5">Analytics</span></a><a class="flex-1 flex flex-col items-center justify-center min-h-[44px] py-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="assessments" href="#"><span class="material-symbols-outlined text-[20px]">clinical_notes</span><span class="font-label-sm text-label-sm tracking-normal mt-0.5">Assessments</span></a><a class="flex-1 flex flex-col items-center justify-center min-h-[44px] py-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="actions" href="#"><span class="material-symbols-outlined text-[20px]">crisis_alert</span><span class="font-label-sm text-label-sm tracking-normal mt-0.5">Actions</span></a><a class="flex-1 flex flex-col items-center justify-center min-h-[44px] py-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="profile" href="#"><span class="material-symbols-outlined text-[20px]">admin_panel_settings</span><span class="font-label-sm text-label-sm tracking-normal mt-0.5">Profile</span></a></div></nav></body></html>

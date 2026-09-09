@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
+import '../data/admin_demo_data.dart';
 import '../models/ml_models.dart';
 import '../services/db_service.dart';
 import '../services/ml_service.dart';
+import '../widgets/dashboard/dashboard_kit.dart';
 import '../widgets/ml_settings_dialog.dart';
-import '../widgets/quick_screen_switcher.dart';
 
-/// Welfare Risk Analytics board — the consumer of the ManoFit Analytics & ML
-/// microservice. Operates strictly on pseudonymized tokens and shows only
-/// clinical risk *bands* plus SHAP-style factor attributions; raw model
-/// probabilities are never rendered.
+/// Welfare Risk Analytics console.
+///
+/// Information architecture follows mindspace's admin overview (executive
+/// summary → population breakdown → composite indices → cohort ranking →
+/// drill-down), rendered in the ManoFit stitch tokens.
+///
+/// Risk *bands* come from the scoring pipeline — the live ML microservice when
+/// reachable, `MlService`'s on-device heuristics otherwise. Trend, unit
+/// aggregates and review-queue figures are fixed demo data
+/// (`admin_demo_data.dart`) until those endpoints exist.
+///
+/// PRD §8.1 / §3: bands, aggregates and factor attributions only — never a raw
+/// model probability, never an identity.
 class HrRiskAnalyticsScreen extends StatefulWidget {
   const HrRiskAnalyticsScreen({super.key});
 
@@ -25,7 +35,6 @@ class _HrRiskAnalyticsScreenState extends State<HrRiskAnalyticsScreen> {
 
   BatchRiskResult? _result;
   bool _isScoring = false;
-  String? _error;
 
   @override
   void initState() {
@@ -45,69 +54,42 @@ class _HrRiskAnalyticsScreenState extends State<HrRiskAnalyticsScreen> {
   }
 
   Future<void> _runAnalysis() async {
+    setState(() => _isScoring = true);
+    // scoreBatch falls back to on-device heuristics when the service is
+    // unreachable, so this never leaves the board empty.
+    await _ml.checkHealth();
+    final result = await _ml.scoreBatch(_db.buildCohortScoringPayload());
+    if (!mounted) return;
     setState(() {
-      _isScoring = true;
-      _error = null;
+      _result = result;
+      _isScoring = false;
     });
-
-    try {
-      await _ml.checkHealth();
-      final payload = _db.buildCohortScoringPayload();
-      final result = await _ml.scoreBatch(payload);
-      if (mounted) {
-        setState(() {
-          _result = result;
-          _isScoring = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isScoring = false;
-        });
-      }
-    }
   }
 
-  Color _bandColor(RiskBand band) => switch (band) {
-        RiskBand.elevated => AppColors.error,
-        RiskBand.moderate => const Color(0xFFB26A00),
-        RiskBand.low => AppColors.secondary,
-      };
-
-  Color _bandContainer(RiskBand band) => switch (band) {
-        RiskBand.elevated => AppColors.errorContainer,
-        RiskBand.moderate => const Color(0xFFFFE7C2),
-        RiskBand.low => AppColors.secondaryContainer,
+  static Color _bandColor(RiskBand b) => switch (b) {
+        RiskBand.elevated => AppColors.statusDistress,
+        RiskBand.moderate => AppColors.statusCaution,
+        RiskBand.low => AppColors.statusPositive,
       };
 
   @override
   Widget build(BuildContext context) {
-    final result = _result;
+    final r = _result;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         backgroundColor: AppColors.surfaceContainerLowest,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/hr-overview'),
+          onPressed: () => context.backOr(),
         ),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Welfare Risk Analytics',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text('Predictive Behavioural Model • Pseudonymized Cohort',
-                style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
-          ],
-        ),
+        title: const Text('Welfare Risk Analytics',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_ethernet, size: 20),
-            tooltip: 'ML Service Endpoint',
+            tooltip: 'ML service endpoint',
             onPressed: () => MlSettingsDialog.show(context),
           ),
           IconButton(
@@ -120,34 +102,49 @@ class _HrRiskAnalyticsScreenState extends State<HrRiskAnalyticsScreen> {
             tooltip: 'Re-run cohort scoring',
             onPressed: _isScoring ? null : _runAnalysis,
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _runAnalysis,
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
             children: [
-              _serviceStatusBanner(),
-              const SizedBox(height: 16),
-              if (_error != null) ...[
-                _errorCard(_error!),
-                const SizedBox(height: 16),
-              ],
-              if (_isScoring && result == null)
+              PageHeading(
+                title: 'Cohort Risk Board',
+                subtitle:
+                    'Pseudonymized cohort · rolling 30-day feature window',
+                badge: _ml.isOnline ? 'Live model' : 'On-device scoring',
+              ),
+
+              if (r == null)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 60),
+                  padding: EdgeInsets.symmetric(vertical: 48),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (result != null) ...[
-                _distributionSection(result),
-                const SizedBox(height: 24),
-                _cohortSection(result),
-                const SizedBox(height: 24),
-                _modelCardSection(),
-                const SizedBox(height: 24),
-                _privacyFooter(),
+              else ...[
+                _summary(r),
+                const SizedBox(height: 16),
+                _indices(r),
+                const SizedBox(height: 16),
+                _distribution(r),
+                const SizedBox(height: 16),
+                _trend(),
+                const SizedBox(height: 16),
+                _units(),
+                const SizedBox(height: 16),
+                _drivers(),
+                const SizedBox(height: 20),
+                SectionHeading('Cases awaiting clinical review',
+                    icon: Icons.medical_information_outlined,
+                    trailing: StatusPill(
+                      label: '${_needsReview(r).length} open',
+                      fg: AppColors.error,
+                      bg: AppColors.errorContainer,
+                    )),
+                ..._needsReview(r).map(_caseCard),
+                const SizedBox(height: 16),
+                _provenance(r),
               ],
             ],
           ),
@@ -156,540 +153,342 @@ class _HrRiskAnalyticsScreenState extends State<HrRiskAnalyticsScreen> {
     );
   }
 
-  // -------------------------------------------------------------------
-  // Service status
-  // -------------------------------------------------------------------
+  List<RiskAssessment> _needsReview(BatchRiskResult r) => r.results
+      .where((a) => a.riskBand != RiskBand.low)
+      .toList()
+    ..sort((a, b) => a.riskBand.index.compareTo(b.riskBand.index));
 
-  Widget _serviceStatusBanner() {
-    final online = _ml.isOnline;
-    final color = online ? AppColors.secondary : const Color(0xFFB26A00);
-    final container =
-        online ? AppColors.secondaryContainer : const Color(0xFFFFE7C2);
+  // ── Sections ─────────────────────────────────────────────────────────────
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: container,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.35)),
-      ),
-      child: Row(
-        children: [
-          Icon(online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
-              color: color, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  online
-                      ? 'Analytics & ML Microservice Connected'
-                      : 'ML Microservice Unreachable',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: color),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  online ? '${_ml.statusMessage} • ${_ml.baseUrl}' : _ml.statusMessage,
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  Widget _summary(BatchRiskResult r) {
+    final elevatedPct =
+        r.totalEvaluated == 0 ? 0 : (r.elevatedCount / r.totalEvaluated * 100);
+    final worst = kUnitRisk.first;
+    final trendDown = kWellbeingIndexDelta < 0;
+
+    return ExecutiveSummaryCard(
+      eyebrow: 'Executive summary',
+      headline: r.elevatedCount == 0
+          ? 'No personnel are currently in the elevated band.'
+          : '${r.elevatedCount} of ${r.totalEvaluated} personnel are in the elevated band.',
+      body:
+          'Composite wellbeing index sits at ${kWellbeingIndexTrend.last.toStringAsFixed(1)}/100, '
+          '${trendDown ? 'down' : 'up'} ${kWellbeingIndexDelta.abs().toStringAsFixed(1)} points across the 12-week window. '
+          'Every flag below requires clinician sign-off before any outreach.',
+      bullets: [
+        '${worst.name} carries the highest strain (${worst.severity.toStringAsFixed(0)}/100, ${worst.elevated} elevated of ${worst.headcount}).',
+        '${kTopStrainDrivers.keys.first} is the most frequent top factor, appearing in ${kTopStrainDrivers.values.first.toStringAsFixed(0)}% of flagged cases.',
+        '$kAwaitingClinicalReview cases await review; $kOutreachCompleted outreaches completed this cycle.',
+        '${elevatedPct.toStringAsFixed(1)}% of the scored cohort is elevated.',
+      ],
+      footnote:
+          'Tokens only — no names, Service IDs or raw scores are rendered on this board.',
     );
   }
 
-  Widget _errorCard(String message) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.errorContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(message,
-                style: const TextStyle(fontSize: 12, color: AppColors.error)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------
-  // Risk band distribution
-  // -------------------------------------------------------------------
-
-  Widget _distributionSection(BatchRiskResult r) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _indices(BatchRiskResult r) {
+    return TileGrid(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Cohort Risk Distribution',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary)),
-            Text('${r.totalEvaluated} personnel',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.onSurfaceVariant)),
-          ],
+        IndexTile(
+          label: 'Cohort evaluated',
+          value: '${r.totalEvaluated}',
+          hint: 'pseudonymized tokens',
+          icon: Icons.groups_outlined,
+          accent: AppColors.primary,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _bandStatCard('Low', r.lowCount, RiskBand.low),
-            const SizedBox(width: 10),
-            _bandStatCard('Moderate', r.moderateCount, RiskBand.moderate),
-            const SizedBox(width: 10),
-            _bandStatCard('Elevated', r.elevatedCount, RiskBand.elevated),
-          ],
+        IndexTile(
+          label: 'Elevated band',
+          value: '${r.elevatedCount}',
+          hint: 'needs clinical review',
+          icon: Icons.priority_high_rounded,
+          accent: AppColors.error,
+          delta: kElevatedShareTrend.last - kElevatedShareTrend.first,
+          deltaGoodWhenNegative: true,
         ),
-        const SizedBox(height: 14),
-        _distributionBar(r),
+        IndexTile(
+          label: 'Wellbeing index',
+          value: kWellbeingIndexTrend.last.toStringAsFixed(1),
+          hint: '100 = best · 12-week composite',
+          icon: Icons.insights_outlined,
+          accent: AppColors.secondary,
+          delta: kWellbeingIndexDelta,
+        ),
+        IndexTile(
+          label: 'Awaiting review',
+          value: '$kAwaitingClinicalReview',
+          hint: '$kReviewedThisCycle reviewed this cycle',
+          icon: Icons.pending_actions_outlined,
+          accent: const Color(0xFFB26A00),
+        ),
       ],
     );
   }
 
-  Widget _bandStatCard(String label, int count, RiskBand band) {
-    return Expanded(
+  Widget _distribution(BatchRiskResult r) {
+    return ChartCard(
+      title: 'Risk band distribution',
+      description: 'Where the scored cohort currently sits',
+      child: StackedShareBar(
+        segments: [
+          ShareSegment('Low', r.lowCount, AppColors.statusPositive),
+          ShareSegment('Moderate', r.moderateCount, AppColors.statusCaution),
+          ShareSegment('Elevated', r.elevatedCount, AppColors.statusDistress),
+        ],
+      ),
+    );
+  }
+
+  Widget _trend() {
+    return ChartCard(
+      title: 'Composite wellbeing index',
+      description: '12-week trend · higher is better',
+      trailing: DeltaBadge(kWellbeingIndexDelta),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TrendChart(values: kWellbeingIndexTrend),
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Elevated share of cohort',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary)),
+              ),
+              DeltaBadge(
+                  kElevatedShareTrend.last - kElevatedShareTrend.first,
+                  suffix: '%',
+                  goodWhenNegative: true),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TrendChart(
+              values: kElevatedShareTrend,
+              height: 42,
+              color: AppColors.statusDistress),
+        ],
+      ),
+    );
+  }
+
+  Widget _units() {
+    return ChartCard(
+      title: 'Unit severity ranking',
+      description: 'Peak domain severity by unit · aggregates only',
+      child: RankedBarChart(
+        maxValue: 100,
+        rows: [
+          for (final u in kUnitRisk)
+            RankedRow(
+              u.name,
+              u.severity,
+              caption:
+                  '${u.unitCode} · ${u.elevated} elevated of ${u.headcount} · '
+                  '${u.delta >= 0 ? '+' : ''}${u.delta.toStringAsFixed(1)} wk/wk',
+              color: u.severity >= 65
+                  ? AppColors.statusDistress
+                  : u.severity >= 45
+                      ? AppColors.statusCaution
+                      : AppColors.statusPositive,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _drivers() {
+    return ChartCard(
+      title: 'Top strain drivers',
+      description: 'How often each appears as a top factor in flagged cases',
+      child: RankedBarChart(
+        maxValue: 100,
+        valueSuffix: '%',
+        rows: [
+          for (final e in kTopStrainDrivers.entries)
+            RankedRow(e.key, e.value, color: AppColors.primaryContainer),
+        ],
+      ),
+    );
+  }
+
+  Widget _caseCard(RiskAssessment a) {
+    final color = _bandColor(a.riskBand);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _bandColor(band).withOpacity(0.25)),
+          border: Border.all(color: AppColors.hairline),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            leading: Container(
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                  color: _bandColor(band), shape: BoxShape.circle),
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.shield_outlined, size: 18, color: color),
             ),
-            const SizedBox(height: 12),
-            Text('$count',
-                style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: _bandColor(band))),
-            const SizedBox(height: 2),
-            Text(label,
+            title: Text(a.pseudonymToken,
                 style: const TextStyle(
-                    fontSize: 11, color: AppColors.onSurfaceVariant)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _distributionBar(BatchRiskResult r) {
-    if (r.totalEvaluated == 0) return const SizedBox.shrink();
-
-    Widget segment(int count, RiskBand band) {
-      if (count == 0) return const SizedBox.shrink();
-      return Expanded(
-        flex: count,
-        child: Container(color: _bandColor(band)),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            height: 12,
-            child: Row(
-              children: [
-                segment(r.lowCount, RiskBand.low),
-                segment(r.moderateCount, RiskBand.moderate),
-                segment(r.elevatedCount, RiskBand.elevated),
-              ],
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary)),
+            subtitle: Text(
+              '${a.riskBand.displayName} band · confidence ${(a.confidence * 100).round()}%',
+              style: const TextStyle(
+                  fontSize: 11.5, color: AppColors.onSurfaceVariant),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${(r.elevatedRatio * 100).toStringAsFixed(1)}% of the cohort is in the '
-          'Elevated band and warrants proactive, confidential welfare outreach.',
-          style: const TextStyle(
-              fontSize: 11, color: AppColors.onSurfaceVariant, height: 1.4),
-        ),
-      ],
-    );
-  }
-
-  // -------------------------------------------------------------------
-  // Per-personnel breakdown
-  // -------------------------------------------------------------------
-
-  Widget _cohortSection(BatchRiskResult r) {
-    // Highest-risk personnel first so outreach queues top the list.
-    final sorted = [...r.results]
-      ..sort((a, b) => b.riskBand.index.compareTo(a.riskBand.index));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Pseudonymized Cohort Assessment',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary)),
-        const SizedBox(height: 4),
-        const Text(
-          'Tap a token to view the contributing factors shared with Welfare Officers.',
-          style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
-        ),
-        const SizedBox(height: 12),
-        ...sorted.map(_personnelTile),
-      ],
-    );
-  }
-
-  Widget _personnelTile(RiskAssessment a) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          shape: const Border(),
-          leading: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _bandContainer(a.riskBand),
-              borderRadius: BorderRadius.circular(12),
+            trailing: StatusPill(
+              label: a.riskBand.displayName,
+              fg: color,
+              bg: color.withOpacity(0.14),
             ),
-            child: Icon(Icons.fingerprint,
-                color: _bandColor(a.riskBand), size: 22),
-          ),
-          title: Text(
-            a.pseudonymToken,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.onSurface),
-          ),
-          subtitle: Text(
-            'Model ${a.modelVersion} • confidence band ${(a.confidence * 100).toStringAsFixed(0)}%',
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.onSurfaceVariant),
-          ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _bandContainer(a.riskBand),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              a.riskBand.displayName,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: _bandColor(a.riskBand)),
-            ),
-          ),
-          children: [
-            if (a.topFactors.isEmpty)
+            children: [
               const Align(
                 alignment: Alignment.centerLeft,
-                child: Text('No dominant contributing factors identified.',
+                child: Text('CONTRIBUTING FACTORS',
                     style: TextStyle(
-                        fontSize: 12, color: AppColors.onSurfaceVariant)),
-              )
-            else
-              // SHAP weights are unbounded, so bars are scaled against the
-              // strongest factor for this person rather than against 1.0.
-              ...() {
-                final maxWeight = a.topFactors
-                    .map((f) => f.importanceWeight.abs())
-                    .fold<double>(0, (m, w) => w > m ? w : m);
-                return a.topFactors.map((f) => _factorRow(f, maxWeight));
-              }(),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: AppColors.onSurfaceVariant)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Recommended Support Pathway',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary)),
-                  const SizedBox(height: 4),
-                  Text(
-                    a.recommendedSupportPathway,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onSurfaceVariant,
-                        height: 1.4),
+              const SizedBox(height: 8),
+              for (final f in a.topFactors)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(f.displayTitle,
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary)),
+                          ),
+                          Text('${(f.importanceWeight * 100).round()}%',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.secondary)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: f.importanceWeight.clamp(0.0, 1.0),
+                          minHeight: 5,
+                          backgroundColor: AppColors.surfaceContainerHigh,
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(AppColors.secondary),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(f.contextDetail,
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.onSurfaceVariant)),
+                    ],
                   ),
-                ],
+                ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F8F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFD5E5D8)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('RECOMMENDED SUPPORT PATHWAY',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: AppColors.secondary)),
+                    const SizedBox(height: 4),
+                    Text(a.recommendedSupportPathway,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.45,
+                            color: AppColors.primary)),
+                  ],
+                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _provenance(BatchRiskResult r) {
+    final version =
+        r.results.isNotEmpty ? r.results.first.modelVersion : 'unknown';
+    return ChartCard(
+      title: 'Model provenance',
+      description: 'Required alongside every scored board (PRD §5)',
+      child: Column(
+        children: [
+          _kv('Scoring source',
+              _ml.isOnline ? 'Live ML microservice' : 'On-device fallback heuristics'),
+          _kv('Model version', version),
+          _kv('Cohort', '${r.totalEvaluated} pseudonymized tokens'),
+          _kv('Trend & unit aggregates', 'Fixed demo data'),
+          const SizedBox(height: 6),
+          const Row(
+            children: [
+              Icon(Icons.info_outline, size: 13, color: AppColors.onSurfaceVariant),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'A band is never an outcome on its own. Clinical review decides every intervention.',
+                  style: TextStyle(
+                      fontSize: 11, color: AppColors.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 130,
+              child: Text(k,
+                  style: const TextStyle(
+                      fontSize: 11.5, color: AppColors.onSurfaceVariant)),
+            ),
+            Expanded(
+              child: Text(v,
+                  style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary)),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _factorRow(FactorAttribution f, double maxWeight) {
-    final color =
-        f.isRiskIncreasing ? AppColors.error : AppColors.secondary;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            f.isRiskIncreasing
-                ? Icons.trending_up_rounded
-                : Icons.shield_outlined,
-            size: 16,
-            color: color,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(f.displayTitle,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurface)),
-                const SizedBox(height: 2),
-                Text(f.contextDetail,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.onSurfaceVariant,
-                        height: 1.3)),
-                const SizedBox(height: 5),
-                // Relative contribution weight, not a raw risk probability.
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: maxWeight <= 0
-                        ? 0.0
-                        : (f.importanceWeight.abs() / maxWeight)
-                            .clamp(0.0, 1.0),
-                    minHeight: 4,
-                    backgroundColor: AppColors.surfaceContainerHigh,
-                    valueColor: AlwaysStoppedAnimation(color),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------
-  // Model governance
-  // -------------------------------------------------------------------
-
-  Widget _modelCardSection() {
-    final card = _ml.modelCard;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Model Card & Governance',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary)),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: card == null
-              ? const Text(
-                  'Model card unavailable. Start the ML microservice to view '
-                  'training provenance, metrics, and Oversight Board sign-off.',
-                  style: TextStyle(
-                      fontSize: 12, color: AppColors.onSurfaceVariant),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(card.modelName,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.onSurface)),
-                        ),
-                        if (card.oversightBoardApproved)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.verified,
-                                    size: 12, color: AppColors.secondary),
-                                SizedBox(width: 4),
-                                Text('Board Approved',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.secondary)),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${card.modelType} • ${card.version} • validated ${card.lastValidatedDate}',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${card.trainingWindow} • n=${card.sampleSize} • '
-                      '${card.featuresUtilized.length} features',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: card.metrics.entries
-                          .map((e) => _metricChip(e.key, e.value))
-                          .toList(),
-                    ),
-                    if (card.knownLimitations.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      const Text('Known Limitations',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary)),
-                      const SizedBox(height: 6),
-                      ...card.knownLimitations.map(
-                        (l) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('•  ',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.onSurfaceVariant)),
-                              Expanded(
-                                child: Text(l,
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppColors.onSurfaceVariant,
-                                        height: 1.35)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _metricChip(String name, double value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(name.toUpperCase(),
-              style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.onSurfaceVariant)),
-          const SizedBox(width: 6),
-          Text(value.toStringAsFixed(2),
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.secondary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _privacyFooter() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.privacy_tip_outlined,
-              size: 18, color: AppColors.secondary),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'The analytics layer receives only rotating pseudonym tokens and '
-              'derived rolling features — never names, Service/PF numbers, or '
-              'disciplinary and medical records. Outputs are clinical support '
-              'bands, never fitness-for-duty or disciplinary determinations.',
-              style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.onSurfaceVariant,
-                  height: 1.4),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      );
 }

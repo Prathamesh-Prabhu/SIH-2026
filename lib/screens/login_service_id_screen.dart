@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
+import '../core/auth/role_access.dart';
 import '../services/auth_service.dart';
-import '../widgets/quick_screen_switcher.dart';
+import '../services/supabase_service.dart';
 
 class LoginServiceIdScreen extends StatefulWidget {
   const LoginServiceIdScreen({super.key});
@@ -12,52 +14,75 @@ class LoginServiceIdScreen extends StatefulWidget {
 }
 
 class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
-  final _serviceIdController = TextEditingController(text: 'CAPF-8821');
+  final _serviceIdController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _auth = AuthService();
   bool _submitting = false;
+  bool _obscure = true;
+  String? _error;
 
   @override
   void dispose() {
     _serviceIdController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleContinue() async {
-    final text = _serviceIdController.text.trim();
-    if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your Service / PF number')),
-      );
+    FocusScope.of(context).unfocus();
+    final serviceId = _serviceIdController.text.trim();
+    final password = _passwordController.text;
+
+    if (serviceId.isEmpty) {
+      setState(() => _error = 'Enter your Service / PF number.');
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() => _error = 'Enter your access password.');
       return;
     }
 
-    setState(() => _submitting = true);
-    await _auth.initiateServiceIdLogin(text);
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    final result = await _auth.signInWithServiceId(serviceId, password);
+
+    if (!mounted) return;
     setState(() => _submitting = false);
 
-    if (mounted) {
-      context.go('/otp');
+    if (result.ok) {
+      // Land on the console this role owns. The router redirect still has the
+      // final say (e.g. it diverts to /onboarding when consent is pending).
+      context.go(_auth.currentRole.homeRoute);
+    } else {
+      setState(() => _error = result.error ?? 'Sign-in failed.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isMockMode = SupabaseService().isMockMode;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/landing'),
+          onPressed: () => context.backOr('/landing'),
         ),
         actions: [
           TextButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Service ID is printed on your official appointment order or identity card.')),
+                const SnackBar(
+                    content: Text(
+                        'Your Service ID is printed on your appointment order or identity card. Password is issued by your HR cell.')),
               );
             },
-            child: const Text('Need help?', style: TextStyle(color: AppColors.secondary)),
+            child: const Text('Need help?',
+                style: TextStyle(color: AppColors.secondary)),
           ),
           const SizedBox(width: 8),
         ],
@@ -69,7 +94,6 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 12),
-              // Icon Badge
               Container(
                 width: 48,
                 height: 48,
@@ -77,11 +101,12 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
                   color: AppColors.secondaryContainer,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.spa, color: AppColors.onSecondaryContainer, size: 26),
+                child: const Icon(Icons.verified_user,
+                    color: AppColors.onSecondaryContainer, size: 26),
               ),
               const SizedBox(height: 16),
               Text(
-                'Welcome to ManoFit',
+                'Sign in to ManoFit',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
@@ -89,53 +114,81 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Sign in with your Service / PF number',
+                'Use your Service / PF number and issued password',
                 style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
-              // Service ID Input Card
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Service ID field
+              _fieldLabel('Service / PF Number', trailing: 'Verified ID'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _serviceIdController,
+                textInputAction: TextInputAction.next,
+                textCapitalization: TextCapitalization.characters,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    fontSize: 16),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.badge_outlined, color: AppColors.outline),
+                  hintText: 'e.g. CAPF-8821',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Password field
+              _fieldLabel('Access Password'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscure,
+                onSubmitted: (_) => _handleContinue(),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    fontSize: 16),
+                decoration: InputDecoration(
+                  prefixIcon:
+                      const Icon(Icons.lock_outline, color: AppColors.outline),
+                  hintText: 'Issued by your HR cell',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        _obscure ? Icons.visibility_off : Icons.visibility,
+                        color: AppColors.outline),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
+              ),
+
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.errorContainer.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        'Service / PF Number',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
-                      ),
-                      Text(
-                        'Verified ID',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.secondary),
+                      const Icon(Icons.error_outline,
+                          size: 16, color: AppColors.error),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(_error!,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.onErrorContainer,
+                                fontWeight: FontWeight.w500)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _serviceIdController,
-                      style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary, fontSize: 16),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.badge_outlined, color: AppColors.outline),
-                        hintText: 'e.g. CAPF-8821 or HR-ADMIN-01',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
               const SizedBox(height: 20),
 
-              // Submit Button
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -144,14 +197,21 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryContainer,
                     foregroundColor: AppColors.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                   child: _submitting
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Continue', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                            Text('Sign In',
+                                style: TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.w600)),
                             SizedBox(width: 8),
                             Icon(Icons.arrow_forward_rounded, size: 18),
                           ],
@@ -160,84 +220,62 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Security & Encrypted Vault Reassurance Box
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondaryContainer,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.verified_user, color: AppColors.onSecondaryContainer, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Verified government system',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Only the data required for your welfare support is collected. No command chain access.',
-                                style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.shield_outlined,
+                          color: AppColors.onSecondaryContainer, size: 20),
                     ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 8),
-                    const Row(
-                      children: [
-                        Icon(Icons.lock, size: 14, color: AppColors.secondary),
-                        SizedBox(width: 6),
-                        Text(
-                          '256-bit encrypted & isolated credential vault',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.secondary),
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Verified government system. Only data required for your welfare support is collected — there is no command-chain access to your check-ins.',
+                        style: TextStyle(
+                            fontSize: 11, color: AppColors.onSurfaceVariant),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
 
-              // Test Personas Quick Buttons
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Quick-Fill Test Personas:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+              if (isMockMode) ...[
+                const SizedBox(height: 24),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Demo mode — quick-fill personas:',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _testPersonaButton('Dhruv (Personnel)', 'CAPF-8821'),
-                  _testPersonaButton('Sharma (HR Admin)', 'HR-ADMIN-01'),
-                  _testPersonaButton('Dr. Ananya (Welfare)', 'WELFARE-07'),
-                  _testPersonaButton('Col. Rao (Commander)', 'CMD-UNIT-42'),
-                ],
-              ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _persona('Dhruv (Personnel)', 'CAPF-8821'),
+                    _persona('Sharma (HR Admin)', 'HR-ADMIN-01'),
+                    _persona('Dr. Ananya (Welfare)', 'WELFARE-07'),
+                    _persona('Col. Rao (Commander)', 'CMD-UNIT-42'),
+                    _persona('Oversight Board', 'OVERSIGHT-01'),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -245,7 +283,26 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
     );
   }
 
-  Widget _testPersonaButton(String label, String id) {
+  Widget _fieldLabel(String label, {String? trailing}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary)),
+        if (trailing != null)
+          Text(trailing,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.secondary)),
+      ],
+    );
+  }
+
+  Widget _persona(String label, String id) {
     return ActionChip(
       label: Text(label, style: const TextStyle(fontSize: 11)),
       backgroundColor: AppColors.surfaceContainerLowest,
@@ -253,6 +310,7 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
       onPressed: () {
         setState(() {
           _serviceIdController.text = id;
+          _passwordController.text = 'demo';
         });
       },
     );
