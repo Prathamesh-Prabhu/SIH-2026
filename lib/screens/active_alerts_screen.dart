@@ -5,7 +5,6 @@ import '../core/navigation.dart';
 import '../models/ml_models.dart';
 import '../services/hr_analytics_controller.dart';
 import '../services/ml_service.dart';
-import '../widgets/ml_settings_dialog.dart';
 
 /// Predictive Analytics board for the HR Admin flow.
 ///
@@ -77,11 +76,6 @@ class _ActiveAlertsScreenState extends State<ActiveAlertsScreen> {
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _ink),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Model service settings',
-            icon: const Icon(Icons.tune_rounded, color: _ink, size: 20),
-            onPressed: () => MlSettingsDialog.show(context),
-          ),
           IconButton(
             tooltip: 'Re-run scoring',
             icon: _ctrl.loading
@@ -283,19 +277,6 @@ class _ActiveAlertsScreenState extends State<ActiveAlertsScreen> {
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => MlSettingsDialog.show(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _ink,
-                    side: const BorderSide(color: Color(0xFFC1C8C2)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Endpoint settings'),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
                   onPressed: _ctrl.loading ? null : _ctrl.refresh,

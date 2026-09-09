@@ -41,6 +41,32 @@
     max-width: 320px;
     padding: 0 16px;
   }
+  .lang-toggle {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(158, 209, 195, 0.08);
+    border: 1px solid rgba(158, 209, 195, 0.18);
+  }
+  .lang-toggle button {
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: #7fa093;
+    font: inherit;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+    padding: 6px 16px;
+    border-radius: 999px;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .lang-toggle button.on {
+    background: linear-gradient(160deg, #9ED1C3, #37675B);
+    color: #02241f;
+    font-weight: 600;
+  }
   .call-wrap {
     position: relative;
     width: 150px;
@@ -90,6 +116,11 @@
 <body>
   <h1>TARA</h1>
   <p class="tagline">your calm voice companion</p>
+  <div class="lang-toggle" id="langToggle" role="group" aria-label="Conversation language">
+    <button type="button" data-lang="auto">Auto</button>
+    <button type="button" data-lang="en">EN</button>
+    <button type="button" data-lang="hi" lang="hi">हिं</button>
+  </div>
   <div class="call-wrap" id="callWrap">
     <div class="ring"></div>
     <div class="ring"></div>

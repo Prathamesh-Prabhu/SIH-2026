@@ -8,8 +8,6 @@ import '../services/auth_service.dart';
 import '../services/db_service.dart';
 import '../services/hr_analytics_controller.dart';
 import '../services/ml_service.dart';
-import '../widgets/ml_settings_dialog.dart';
-import '../widgets/supabase_settings_dialog.dart';
 
 /// HR Admin console home.
 ///
@@ -66,7 +64,6 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
   @override
   Widget build(BuildContext context) {
     final name = AuthService().currentUser?.fullName ?? 'HR Administrator';
-    final compact = MediaQuery.sizeOf(context).width < 600;
     final summary = _db.hrCohortSummary;
 
     return Scaffold(
@@ -78,17 +75,6 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
         titleSpacing: 14,
         title: const _Brand(),
         actions: [
-          if (!compact)
-            IconButton(
-              tooltip: 'Backend connection',
-              onPressed: () => SupabaseSettingsDialog.show(context),
-              icon: const Icon(Icons.hub_outlined, color: HrAdminOverviewScreen._ink),
-            ),
-          IconButton(
-            tooltip: 'Model connection',
-            onPressed: () => MlSettingsDialog.show(context),
-            icon: const Icon(Icons.tune_rounded, color: HrAdminOverviewScreen._ink),
-          ),
           IconButton(
             tooltip: 'Re-run scoring',
             onPressed: _ctrl.loading ? null : _ctrl.refresh,
@@ -302,18 +288,6 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => MlSettingsDialog.show(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: HrAdminOverviewScreen._ink,
-                    side: const BorderSide(color: Color(0xFFC1C8C2)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                  ),
-                  child: const Text('Endpoint settings'),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
                   onPressed: _ctrl.loading ? null : _ctrl.refresh,

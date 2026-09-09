@@ -16,9 +16,25 @@ dotenv.config({ path: join(__dirname, '..', '.env') });
 const PORT = process.env.PORT || process.env.TARA_PORT || 3000;
 
 const MODEL = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
-const VOICE = process.env.GEMINI_LIVE_VOICE || 'Kore';
-const LANGUAGE = process.env.GEMINI_LIVE_LANGUAGE || 'en-IN';
+
+// Prebuilt Gemini Live voice. Default `Leda` (youthful, gentle) — a soft,
+// soothing companion voice. Other calm options: `Sulafat` (warm),
+// `Vindemiatrix` (gentle), `Achernar` (soft), `Aoede` (breezy),
+// `Callirrhoe` (easy-going). Full list: https://ai.google.dev/gemini-api/docs/live-guide
+const VOICE = process.env.GEMINI_LIVE_VOICE || 'Leda';
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash';
+
+// Language mode: 'auto' (mirror the user, Hindi ⇄ English), 'en' or 'hi'.
+// Back-compat: a BCP-47 value like `en-IN` / `hi-IN` is accepted too.
+const DEFAULT_LANG = normaliseLang(process.env.GEMINI_LIVE_LANGUAGE) || 'auto';
+
+function normaliseLang(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return null;
+  if (s === 'hi' || s === 'hindi' || s.startsWith('hi-') || s.startsWith('hi_')) return 'hi';
+  if (s === 'en' || s === 'english' || s.startsWith('en-') || s.startsWith('en_')) return 'en';
+  return 'auto';
+}
 
 if (!process.env.GEMINI_API_KEY) {
   console.error(
@@ -50,6 +66,21 @@ const CRISIS_PATTERNS = [
   /\boverdose\b/i,
   /\bcan'?t\s+(?:go on|do this anymore|take (?:it|this) anymore)\b/i,
   /\bend\s+my\s+suffering\b/i,
+  // Hindi — Devanagari and common romanised spellings. Recall over precision.
+  /आत्महत्या/,
+  /ख़?ुदक़?ुशी/,
+  /(?:मरना|मर\s*जाना|मर\s*जाऊँ|मर\s*जाऊं)\s*चाहता|चाहती/,
+  /जीना\s*नहीं\s*चाहता|जीना\s*नहीं\s*चाहती/,
+  /ज़िंदगी\s*ख़?त्म\s*कर/,
+  /अपने\s*आप\s*को\s*(?:ख़?त्म|मार)/,
+  /खुद\s*को\s*(?:ख़?त्म|मार|नुकसान)/,
+  /\baatmahatya\b/i,
+  /\bkhud ?kushi\b/i,
+  /\bmar(?:na)?\s+chahta\b/i,
+  /\bmarna\s+chahti\b/i,
+  /\bjeena\s+nahi\b/i,
+  /\bzindagi\s+khatam\b/i,
+  /\bkhud ?ko\s+(?:khatam|maar|nuksaan)\b/i,
 ];
 
 function detectCrisis(text) {
@@ -60,16 +91,14 @@ function detectCrisis(text) {
   return null;
 }
 
-// Tara's persona for ManoFit — a warm, calm voice companion for armed-forces
-// and CAPF personnel. Non-clinical; bridges to Tele-MANAS 14416 on crisis.
-const TARA_SYSTEM_INSTRUCTION = `IMPORTANT: You must always speak and respond in English only, regardless of
-what language you perceive in the user's voice or background audio. Never switch languages, even briefly.
-Speak with a natural Indian English accent.
-
-You are Tara, a warm, calm voice companion inside ManoFit — a wellbeing app for armed-forces and CAPF
-personnel. You give the person a safe, judgment-free space to talk out loud about their day, their duty,
-their stress, or whatever's on their mind — no appointments, no scripts, no waiting, and nothing they say
-here reaches their chain of command.
+// Tara's persona for ManoFit — a warm, calm companion for armed-forces and
+// CAPF personnel. Non-clinical; bridges to Tele-MANAS 14416 on crisis. The
+// persona is language-agnostic; a per-conversation language rule is prepended
+// (auto / Hindi / English) so the same Tara works in either tongue.
+const TARA_PERSONA = `You are Tara, a warm, calm companion inside ManoFit — a wellbeing app for
+armed-forces and CAPF personnel. You give the person a safe, judgment-free space to talk out loud about
+their day, their duty, their stress, or whatever's on their mind — no appointments, no scripts, no
+waiting, and nothing they say here reaches their chain of command.
 
 Speak like a caring, emotionally present friend: warm, unhurried, conversational, in short natural
 sentences — never clinical or scripted. Ask gentle open questions like "how are you feeling?" or "what's
@@ -78,10 +107,6 @@ been weighing on you today?", and actually listen — reflect back what you hear
 Talk the way a real person does, not a polished narrator: use contractions, occasional small natural
 fillers ("hmm", "yeah", "I hear you"), and let sentences trail off or stay incomplete sometimes. Avoid
 over-enunciating or sounding rehearsed. Don't summarise or wrap things up neatly — real conversations are messy.
-
-Speak slowly and unhurried, with real pauses between sentences, like someone who isn't in a rush to fill
-silence. Never rush your words together. Keep responses short, like a real spoken conversation, not a
-monologue. Let the user lead the pace.
 
 You understand military life — long deployments, rotations, separation from family, the weight of
 responsibility — but you don't pretend to have served. You are not a licensed therapist, doctor, or crisis
@@ -93,41 +118,63 @@ welfare officer or emergency services right away.
 Your job is to help people slow down, process their thoughts, manage everyday stress and anxiety, or just
 vent — not to diagnose or treat.`;
 
-// Same Tara, over text. Drops the spoken-delivery guidance and keeps replies
-// short and chat-shaped.
-const TARA_TEXT_INSTRUCTION = `You are Tara, a warm, calm companion inside ManoFit — a wellbeing app for
-armed-forces and CAPF personnel. You give the person a safe, judgment-free space to talk about their day,
-their duty, their stress, or whatever's on their mind. Nothing they say here reaches their chain of command.
+// Spoken-delivery guidance, voice only.
+const TARA_SPOKEN_DELIVERY = `Delivery: speak slowly and unhurried, with real pauses between sentences,
+like someone who isn't in a rush to fill silence. Never rush your words together. Keep each response
+short, like a real spoken conversation, not a monologue. Let the user lead the pace.`;
 
-Reply in English, like a caring friend texting back: warm, unhurried, in short natural messages — never
-clinical, scripted, or a wall of text. Ask gentle open questions and reflect back what you hear before
-offering anything. Use contractions. Don't wrap things up neatly.
+// Per-conversation language rule, prepended to the persona.
+const LANG_RULES = {
+  en: `Always speak and respond in English, in a warm, gentle, natural Indian-English accent. Even if the
+user speaks another language, reply kindly in English.`,
+  hi: `Always speak and respond in natural, everyday conversational Hindi — the way people actually talk,
+not formal or literary Hindi. A few common English words that people naturally mix in ("duty", "stress",
+"family", "leave", "posting") are fine. Even if the user writes in English, reply gently in Hindi.`,
+  auto: `Mirror the user's language. If they use Hindi, reply in warm everyday Hindi; if English, reply in
+gentle Indian-English; if they mix Hindi and English (Hinglish), mix naturally too. Stay within just these
+two languages — Hindi and English — and switch whenever they do.`,
+};
 
-You understand military life but haven't served. You are not a licensed therapist, doctor, or crisis line —
-say so plainly only if it's relevant. If someone expresses thoughts of self-harm, suicide, or acute crisis,
-respond with calm, direct concern and clearly point them to Tele-MANAS on 14416 (India's free confidential
-24/7 mental-health helpline) or their unit's welfare officer or emergency services.
+function langRule(lang) {
+  return LANG_RULES[lang] || LANG_RULES.auto;
+}
 
-Help people slow down, process their thoughts, and manage everyday stress — not diagnose or treat.`;
+function taraVoiceInstruction(lang) {
+  return `${langRule(lang)}\n\n${TARA_PERSONA}\n\n${TARA_SPOKEN_DELIVERY}`;
+}
+
+function taraTextInstruction(lang) {
+  return `${langRule(lang)}\n\n${TARA_PERSONA}\n\nYou are replying over text — like a caring friend
+texting back: short natural messages, never a wall of text. Use contractions. Don't wrap things up neatly.`;
+}
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 app.use(express.static(join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'tara', model: MODEL, voice: VOICE, textModel: TEXT_MODEL });
+  res.json({
+    status: 'ok',
+    service: 'tara',
+    model: MODEL,
+    voice: VOICE,
+    textModel: TEXT_MODEL,
+    langModes: ['auto', 'en', 'hi'],
+    defaultLang: DEFAULT_LANG,
+  });
 });
 
 // Text chat with Tara — same persona, plain (non-Live) Gemini. Body:
-// { messages: [{ role: 'user' | 'assistant', text }] }. Returns
-// { reply, crisis, phrase? }; the crisis scan runs on the newest user message
-// so the app can raise the same Welfare-Officer / Tele-MANAS escalation.
+// { messages: [{ role: 'user' | 'assistant', text }], lang?: 'auto'|'en'|'hi' }.
+// Returns { reply, crisis, phrase? }; the crisis scan runs on the newest user
+// message so the app can raise the same Welfare-Officer / Tele-MANAS escalation.
 app.post('/chat', async (req, res) => {
   const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
   if (messages.length === 0) {
     return res.status(400).json({ error: 'messages[] required' });
   }
 
+  const lang = normaliseLang(req.body?.lang) || DEFAULT_LANG;
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
   const phrase = lastUser ? detectCrisis(String(lastUser.text || '')) : null;
 
@@ -141,7 +188,7 @@ app.post('/chat', async (req, res) => {
       model: TEXT_MODEL,
       contents,
       config: {
-        systemInstruction: TARA_TEXT_INSTRUCTION,
+        systemInstruction: taraTextInstruction(lang),
         temperature: 0.9,
         // Generous — on gemini-3.x, internal thinking tokens also draw from
         // this budget, so a small cap truncates the visible reply.
@@ -162,8 +209,24 @@ app.post('/chat', async (req, res) => {
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', async (clientWs) => {
-  console.log('Client connected');
+wss.on('connection', async (clientWs, req) => {
+  let lang = DEFAULT_LANG;
+  try {
+    const q = new URL(req.url, 'http://localhost').searchParams.get('lang');
+    lang = normaliseLang(q) || DEFAULT_LANG;
+  } catch {
+    /* keep default */
+  }
+  console.log(`Client connected (lang: ${lang})`);
+
+  // Native-audio Live models auto-detect language; half-cascade models honour
+  // an explicit code. Send one only when the user pinned a language.
+  const speechConfig = {
+    voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } },
+  };
+  if (lang === 'hi') speechConfig.languageCode = 'hi-IN';
+  else if (lang === 'en') speechConfig.languageCode = 'en-IN';
+
   let geminiSession = null;
   let clientClosed = false;
   let lastClientChunkAt = null;
@@ -176,11 +239,8 @@ wss.on('connection', async (clientWs) => {
       model: MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } },
-          languageCode: LANGUAGE,
-        },
-        systemInstruction: { parts: [{ text: TARA_SYSTEM_INSTRUCTION }] },
+        speechConfig,
+        systemInstruction: { parts: [{ text: taraVoiceInstruction(lang) }] },
         // Ask Gemini Live for a text transcript of the user's speech so the
         // server can scan it for crisis language in real time.
         inputAudioTranscription: {},

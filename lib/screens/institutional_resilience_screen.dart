@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
-import '../widgets/supabase_settings_dialog.dart';
 
 class InstitutionalResilienceScreen extends StatelessWidget {
   const InstitutionalResilienceScreen({super.key});
@@ -38,11 +37,6 @@ class InstitutionalResilienceScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.hub_outlined, color: Colors.black54),
-            tooltip: 'Supabase Settings',
-            onPressed: () => SupabaseSettingsDialog.show(context),
-          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.black54),
             tooltip: 'Exit to Home',

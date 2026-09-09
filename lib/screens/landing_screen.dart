@@ -4,7 +4,6 @@ import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
-import '../widgets/supabase_settings_dialog.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -23,7 +22,6 @@ class LandingScreen extends StatelessWidget {
             children: [
               // Top Bar
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -47,11 +45,6 @@ class LandingScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.hub_outlined, color: AppColors.secondary, size: 20),
-                    tooltip: 'Supabase Settings',
-                    onPressed: () => SupabaseSettingsDialog.show(context),
                   ),
                 ],
               ),

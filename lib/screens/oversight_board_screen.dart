@@ -9,7 +9,6 @@ import '../core/theme/app_typography.dart';
 import '../models/ml_models.dart';
 import '../services/auth_service.dart';
 import '../services/ml_service.dart';
-import '../widgets/ml_settings_dialog.dart';
 
 /// Ethics / Oversight Board console (PRD §8.3, architecture §4).
 ///
@@ -70,12 +69,6 @@ class _OversightBoardScreenState extends State<OversightBoardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.insights_outlined,
-                color: AppColors.onSurfaceVariant),
-            tooltip: 'Analytics & ML Service',
-            onPressed: () => MlSettingsDialog.show(context),
-          ),
           IconButton(
             icon:
                 const Icon(Icons.refresh, color: AppColors.onSurfaceVariant),

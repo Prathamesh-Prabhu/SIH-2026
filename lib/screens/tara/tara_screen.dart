@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -14,14 +15,19 @@ import '../../services/db_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/tara_settings_dialog.dart';
 
-/// Tara — the wellness companion. The WebView hosts the `tara_service` voice
-/// UI (Gemini Live audio-to-audio); a chat button opens a text conversation
-/// with the same Tara (`POST /chat`, plain Gemini, same persona).
+/// Tara — the wellness companion, with two fully independent modes:
 ///
-/// Both paths scan for crisis language: the relay flags voice via the
-/// `CrisisChannel` JS bridge, `/chat` returns `crisis: true`. Either way
-/// [_escalate] raises a `crisis_alerts` row (Welfare Officer handoff) and
-/// puts Tele-MANAS 14416 one tap away.
+///  * **Chat** — a plain Flutter text conversation (`POST /chat`, non-Live
+///    Gemini). No microphone, no WebView. Available the moment the screen opens.
+///  * **Voice** — the `tara_service` WebView (Gemini Live audio-to-audio). Only
+///    loaded, and only granted the mic, once the user opens this tab.
+///
+/// Switching to Chat, backgrounding the app, or leaving the screen all hang up
+/// any live voice call so nothing keeps running unattended.
+///
+/// Both paths scan for crisis language (voice via the `CrisisChannel` JS bridge,
+/// `/chat` via `crisis: true`); either way [_escalate] raises a `crisis_alerts`
+/// row and puts Tele-MANAS 14416 one tap away.
 class TaraScreen extends StatefulWidget {
   const TaraScreen({super.key});
 
@@ -29,21 +35,87 @@ class TaraScreen extends StatefulWidget {
   State<TaraScreen> createState() => _TaraScreenState();
 }
 
-class _TaraScreenState extends State<TaraScreen> {
+enum _TaraMode { chat, voice }
+
+class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
+  static const _modePrefsKey = 'manofit_tara_mode';
+  static const _ink = Color(0xFF02150F);
+  static const _mint = Color(0xFF9ED1C3);
+  static const _pine = Color(0xFF37675B);
+
   WebViewController? _controller;
-  bool _loading = true;
-  String? _error;
+  bool _voiceLoading = true;
+  String? _voiceError;
   bool _micGranted = false;
   bool _crisisHandled = false;
+
+  _TaraMode _mode = _TaraMode.chat;
+  bool _voiceRequested = false; // first time the Voice tab is opened
+  bool _voiceIniting = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     context.read<DbService>().noteTaraOpened();
-    _init();
+    _restoreMode();
   }
 
-  Future<void> _init() async {
+  Future<void> _restoreMode() async {
+    var restored = _TaraMode.chat;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getString(_modePrefsKey) == 'voice') restored = _TaraMode.voice;
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _mode = restored);
+    if (restored == _TaraMode.voice) _activateVoice();
+  }
+
+  @override
+  void dispose() {
+    _hangUpVoice();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The app going to the background must not leave a live mic + Gemini
+    // session running behind it.
+    if (state != AppLifecycleState.resumed) _hangUpVoice();
+  }
+
+  void _hangUpVoice() {
+    try {
+      _controller?.runJavaScript('window.__taraEndCall && window.__taraEndCall();');
+    } catch (_) {}
+  }
+
+  Future<void> _persistMode(_TaraMode m) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_modePrefsKey, m == _TaraMode.voice ? 'voice' : 'chat');
+    } catch (_) {}
+  }
+
+  void _selectMode(_TaraMode m) {
+    if (m == _mode) return;
+    if (m == _TaraMode.chat) _hangUpVoice();
+    setState(() => _mode = m);
+    _persistMode(m);
+    if (m == _TaraMode.voice) _activateVoice();
+  }
+
+  Future<void> _activateVoice() async {
+    if (_voiceIniting || _controller != null) return;
+    _voiceIniting = true;
+    if (mounted) setState(() => _voiceRequested = true);
+    await _initVoice();
+    _voiceIniting = false;
+  }
+
+  Future<void> _initVoice() async {
     final status = await Permission.microphone.request();
     if (!mounted) return;
     _micGranted = status.isGranted;
@@ -60,7 +132,7 @@ class _TaraScreenState extends State<TaraScreen> {
       const PlatformWebViewControllerCreationParams(),
     )
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF02150F))
+      ..setBackgroundColor(_ink)
       ..addJavaScriptChannel(
         'CrisisChannel',
         onMessageReceived: (m) => _onCrisisMessage(m.message),
@@ -68,17 +140,17 @@ class _TaraScreenState extends State<TaraScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
-            if (mounted) setState(() => _loading = true);
+            if (mounted) setState(() => _voiceLoading = true);
           },
           onPageFinished: (_) {
-            if (mounted) setState(() => _loading = false);
+            if (mounted) setState(() => _voiceLoading = false);
           },
           onWebResourceError: (err) {
             if (err.isForMainFrame == false) return;
             if (mounted) {
               setState(() {
-                _loading = false;
-                _error = err.description;
+                _voiceLoading = false;
+                _voiceError = err.description;
               });
             }
           },
@@ -95,10 +167,10 @@ class _TaraScreenState extends State<TaraScreen> {
     if (mounted) setState(() => _controller = controller);
   }
 
-  Future<void> _reload() async {
+  Future<void> _reloadVoice() async {
     setState(() {
-      _error = null;
-      _loading = true;
+      _voiceError = null;
+      _voiceLoading = true;
       _crisisHandled = false;
     });
     final sb = context.read<SupabaseService>();
@@ -188,12 +260,11 @@ class _TaraScreenState extends State<TaraScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF16241F),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF37675B)),
+                border: Border.all(color: _pine),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.verified_user_rounded,
-                      size: 16, color: Color(0xFF9ED1C3)),
+                  Icon(Icons.verified_user_rounded, size: 16, color: _mint),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -201,9 +272,7 @@ class _TaraScreenState extends State<TaraScreen> {
                       'supportive check-in. This never goes to your command '
                       'chain.',
                       style: TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF9ED1C3),
-                          height: 1.4),
+                          fontSize: 11.5, color: _mint, height: 1.4),
                     ),
                   ),
                 ],
@@ -233,7 +302,7 @@ class _TaraScreenState extends State<TaraScreen> {
               child: TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Stay in the conversation with Tara',
-                    style: TextStyle(color: Color(0xFF9ED1C3))),
+                    style: TextStyle(color: _mint)),
               ),
             ),
           ],
@@ -242,30 +311,14 @@ class _TaraScreenState extends State<TaraScreen> {
     );
   }
 
-  void _openChat() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: const Color(0xFF071A14),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (_) => _TaraChatSheet(
-        onCrisis: (phrase, lastUserText) =>
-            _escalate(phrase: phrase, transcript: lastUserText),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final controller = _controller;
+    final voiceMode = _mode == _TaraMode.voice;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF02150F),
+      backgroundColor: _ink,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF02150F),
+        backgroundColor: _ink,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -275,62 +328,139 @@ class _TaraScreenState extends State<TaraScreen> {
             style: TextStyle(
                 fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
         actions: [
-          IconButton(
-            tooltip: 'Voice relay connection',
-            icon: const Icon(Icons.settings_ethernet_rounded),
-            onPressed: () async {
-              final reload = await TaraSettingsDialog.show(context);
-              if (reload == true && mounted) _reload();
-            },
-          ),
-          IconButton(
-            tooltip: 'Reload',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: (controller != null || _error != null) ? _reload : null,
-          ),
-        ],
-      ),
-      floatingActionButton: (_error == null)
-          ? FloatingActionButton.extended(
-              backgroundColor: const Color(0xFF37675B),
-              foregroundColor: Colors.white,
-              onPressed: _openChat,
-              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-              label: const Text('Chat'),
-            )
-          : null,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            if (_error != null)
-              _ErrorPanel(message: _error!, onRetry: _reload)
-            else if (controller == null)
-              const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF9ED1C3)))
-            else ...[
-              WebViewWidget(controller: controller),
-              if (_loading)
-                const Center(
-                    child:
-                        CircularProgressIndicator(color: Color(0xFF9ED1C3))),
-            ],
-            if (_error == null && !_micGranted)
-              const Align(
-                alignment: Alignment.bottomCenter,
-                child: _MicHint(
-                  text: 'Microphone permission was denied: grant it in '
-                      'Settings and reload for voice. Text chat still works.',
-                ),
-              )
-            else if (_error == null && !TaraConfig.isSecureContext)
-              const Align(
-                alignment: Alignment.bottomCenter,
-                child: _MicHint(
-                  text: 'Tara requires a secure HTTPS connection for microphone access. '
-                      'Text chat is still available.',
-                ),
-              ),
+          if (voiceMode) ...[
+            IconButton(
+              tooltip: 'Voice relay connection',
+              icon: const Icon(Icons.settings_ethernet_rounded),
+              onPressed: () async {
+                final reload = await TaraSettingsDialog.show(context);
+                if (reload == true && mounted) _reloadVoice();
+              },
+            ),
+            IconButton(
+              tooltip: 'Reload',
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: (_controller != null || _voiceError != null)
+                  ? _reloadVoice
+                  : null,
+            ),
           ],
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(54),
+          child: _ModeToggle(current: _mode, onChanged: _selectMode),
+        ),
+      ),
+      body: SafeArea(
+        child: IndexedStack(
+          sizing: StackFit.expand,
+          index: voiceMode ? 1 : 0,
+          children: [
+            _TaraChatView(
+              onCrisis: (phrase, lastUserText) =>
+                  _escalate(phrase: phrase, transcript: lastUserText),
+            ),
+            _voicePane(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _voicePane() {
+    if (!_voiceRequested || (_controller == null && _voiceError == null)) {
+      return const Center(child: CircularProgressIndicator(color: _mint));
+    }
+    if (_voiceError != null) {
+      return _ErrorPanel(message: _voiceError!, onRetry: _reloadVoice);
+    }
+    final controller = _controller!;
+    return Stack(
+      children: [
+        WebViewWidget(controller: controller),
+        if (_voiceLoading)
+          const Center(child: CircularProgressIndicator(color: _mint)),
+        if (!_micGranted)
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: _MicHint(
+              text: 'Microphone permission was denied: grant it in Settings and '
+                  'reload for voice. Use Chat in the meantime.',
+            ),
+          )
+        else if (!TaraConfig.isSecureContext)
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: _MicHint(
+              text: 'Tara needs a secure HTTPS connection for microphone access. '
+                  'Chat still works.',
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Voice / Chat mode toggle ───────────────────────────────────────────────
+class _ModeToggle extends StatelessWidget {
+  const _ModeToggle({required this.current, required this.onChanged});
+
+  final _TaraMode current;
+  final ValueChanged<_TaraMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0C231C),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0x2E9ED1C3)),
+        ),
+        child: Row(
+          children: [
+            _seg('Chat', Icons.chat_bubble_outline_rounded, _TaraMode.chat),
+            _seg('Voice', Icons.graphic_eq_rounded, _TaraMode.voice),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _seg(String label, IconData icon, _TaraMode mode) {
+    final active = current == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(mode),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            gradient: active
+                ? const LinearGradient(colors: [Color(0xFF9ED1C3), Color(0xFF37675B)])
+                : null,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  size: 15,
+                  color: active ? const Color(0xFF02241F) : const Color(0xFF7FA093)),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: active
+                        ? const Color(0xFF02241F)
+                        : const Color(0xFF7FA093),
+                  )),
+            ],
+          ),
         ),
       ),
     );
@@ -344,25 +474,54 @@ class _ChatMsg {
   final String text;
 }
 
-class _TaraChatSheet extends StatefulWidget {
-  const _TaraChatSheet({required this.onCrisis});
+class _TaraChatView extends StatefulWidget {
+  const _TaraChatView({required this.onCrisis});
 
   /// (matchedPhrase, lastUserText) — raise the crisis escalation.
   final void Function(String? phrase, String lastUserText) onCrisis;
 
   @override
-  State<_TaraChatSheet> createState() => _TaraChatSheetState();
+  State<_TaraChatView> createState() => _TaraChatViewState();
 }
 
-class _TaraChatSheetState extends State<_TaraChatSheet> {
+class _TaraChatViewState extends State<_TaraChatView> {
+  static const _langPrefsKey = 'manofit_tara_chat_lang';
+
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final List<_ChatMsg> _messages = [
-    _ChatMsg('assistant',
-        "Hey, I'm Tara. Whatever's on your mind: the day, the duty, "
-        "or something heavier, I'm here. What's going on?"),
+    _ChatMsg(
+        'assistant',
+        "Hey, I'm Tara — English or हिंदी, whichever's easier. Whatever's on "
+        "your mind: the day, the duty, or something heavier, I'm here. "
+        "What's going on?"),
   ];
   bool _sending = false;
+  String _lang = 'auto'; // 'auto' | 'en' | 'hi'
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreLang();
+  }
+
+  Future<void> _restoreLang() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString(_langPrefsKey);
+      if ((v == 'auto' || v == 'en' || v == 'hi') && mounted) {
+        setState(() => _lang = v!);
+      }
+    } catch (_) {}
+  }
+
+  void _setLang(String v) {
+    if (v == _lang) return;
+    setState(() => _lang = v);
+    SharedPreferences.getInstance()
+        .then((p) => p.setString(_langPrefsKey, v))
+        .catchError((_) => false);
+  }
 
   @override
   void dispose() {
@@ -396,6 +555,7 @@ class _TaraChatSheetState extends State<_TaraChatSheet> {
             Uri.parse('${TaraConfig.url}/chat'),
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode({
+              'lang': _lang,
               'messages': _messages
                   .map((m) => {'role': m.role, 'text': m.text})
                   .toList(),
@@ -407,8 +567,8 @@ class _TaraChatSheetState extends State<_TaraChatSheet> {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final reply = (data['reply'] as String?)?.trim();
         if (mounted) {
-          setState(() => _messages
-              .add(_ChatMsg('assistant', reply?.isNotEmpty == true ? reply! : "I'm here.")));
+          setState(() => _messages.add(_ChatMsg(
+              'assistant', reply?.isNotEmpty == true ? reply! : "I'm here.")));
         }
         if (data['crisis'] == true) {
           widget.onCrisis(data['phrase'] as String?, text);
@@ -433,136 +593,152 @@ class _TaraChatSheetState extends State<_TaraChatSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                  color: const Color(0xFF37675B),
-                  borderRadius: BorderRadius.circular(2)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 8, 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.chat_bubble_rounded,
-                      color: Color(0xFF9ED1C3), size: 18),
-                  const SizedBox(width: 8),
-                  const Text('Chat with Tara',
+    return Column(
+      children: [
+        _ChatLangBar(current: _lang, onChanged: _setLang),
+        const Divider(height: 1, color: Color(0xFF15332A)),
+        Expanded(
+          child: ListView.builder(
+            controller: _scroll,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            itemCount: _messages.length + (_sending ? 1 : 0),
+            itemBuilder: (context, i) {
+              if (_sending && i == _messages.length) {
+                return const Padding(
+                  padding: EdgeInsets.only(left: 6, top: 4),
+                  child: Text('Tara is typing…',
                       style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white)),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Color(0xFF15332A)),
-            Expanded(
-              child: ListView.builder(
-                controller: _scroll,
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                itemCount: _messages.length + (_sending ? 1 : 0),
-                itemBuilder: (context, i) {
-                  if (_sending && i == _messages.length) {
-                    return const Padding(
-                      padding: EdgeInsets.only(left: 6, top: 4),
-                      child: Text('Tara is typing…',
-                          style: TextStyle(
-                              color: Color(0xFF7FA093),
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic)),
-                    );
-                  }
-                  final m = _messages[i];
-                  final isUser = m.role == 'user';
-                  return Align(
-                    alignment:
-                        isUser ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 13, vertical: 10),
-                      constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.78),
-                      decoration: BoxDecoration(
-                        color: isUser
-                            ? const Color(0xFF37675B)
-                            : const Color(0xFF102820),
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(14),
-                          topRight: const Radius.circular(14),
-                          bottomLeft: Radius.circular(isUser ? 14 : 4),
-                          bottomRight: Radius.circular(isUser ? 4 : 14),
-                        ),
-                      ),
-                      child: Text(m.text,
-                          style: TextStyle(
-                              fontSize: 13.5,
-                              height: 1.4,
-                              color: isUser
-                                  ? Colors.white
-                                  : const Color(0xFFE6F2EE))),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFF071A14),
-                border: Border(top: BorderSide(color: Color(0xFF15332A))),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      minLines: 1,
-                      maxLines: 4,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(),
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 13.5),
-                      decoration: InputDecoration(
-                        hintText: 'Message Tara…',
-                        hintStyle: const TextStyle(color: Color(0xFF6F8F84)),
-                        filled: true,
-                        fillColor: const Color(0xFF102820),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                          color: Color(0xFF7FA093),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic)),
+                );
+              }
+              final m = _messages[i];
+              final isUser = m.role == 'user';
+              return Align(
+                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                  constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.78),
+                  decoration: BoxDecoration(
+                    color: isUser
+                        ? const Color(0xFF37675B)
+                        : const Color(0xFF102820),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(14),
+                      topRight: const Radius.circular(14),
+                      bottomLeft: Radius.circular(isUser ? 14 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 14),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFF9ED1C3),
-                    child: IconButton(
-                      icon: const Icon(Icons.send_rounded,
-                          size: 18, color: Color(0xFF02241F)),
-                      onPressed: _sending ? null : _send,
+                  child: Text(m.text,
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          height: 1.4,
+                          color: isUser
+                              ? Colors.white
+                              : const Color(0xFFE6F2EE))),
+                ),
+              );
+            },
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          decoration: const BoxDecoration(
+            color: Color(0xFF071A14),
+            border: Border(top: BorderSide(color: Color(0xFF15332A))),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _input,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(),
+                  style:
+                      const TextStyle(color: Colors.white, fontSize: 13.5),
+                  decoration: InputDecoration(
+                    hintText: 'Message Tara…',
+                    hintStyle: const TextStyle(color: Color(0xFF6F8F84)),
+                    filled: true,
+                    fillColor: const Color(0xFF102820),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              CircleAvatar(
+                backgroundColor: const Color(0xFF9ED1C3),
+                child: IconButton(
+                  icon: const Icon(Icons.send_rounded,
+                      size: 18, color: Color(0xFF02241F)),
+                  onPressed: _sending ? null : _send,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChatLangBar extends StatelessWidget {
+  const _ChatLangBar({required this.current, required this.onChanged});
+
+  final String current;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF071A14),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.translate_rounded, size: 14, color: Color(0xFF7FA093)),
+          const SizedBox(width: 8),
+          const Text('Language',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF7FA093))),
+          const Spacer(),
+          _pill('Auto', 'auto'),
+          _pill('EN', 'en'),
+          _pill('हिं', 'hi'),
+        ],
+      ),
+    );
+  }
+
+  Widget _pill(String label, String value) {
+    final active = current == value;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: GestureDetector(
+        onTap: () => onChanged(value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF9ED1C3) : const Color(0xFF102820),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color:
+                    active ? const Color(0xFF02241F) : const Color(0xFF7FA093),
+              )),
         ),
       ),
     );
@@ -583,15 +759,12 @@ class _ErrorPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 44, color: Color(0xFF9ED1C3)),
+            const Icon(Icons.cloud_off_rounded, size: 44, color: Color(0xFF9ED1C3)),
             const SizedBox(height: 14),
             const Text(
               "Can't reach the Tara service",
               style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white),
+                  fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
             ),
             const SizedBox(height: 8),
             Text(
@@ -625,7 +798,7 @@ class _MicHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 84),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.55),

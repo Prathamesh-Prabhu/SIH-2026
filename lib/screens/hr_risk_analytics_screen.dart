@@ -7,7 +7,6 @@ import '../models/ml_models.dart';
 import '../services/db_service.dart';
 import '../services/ml_service.dart';
 import '../widgets/dashboard/dashboard_kit.dart';
-import '../widgets/ml_settings_dialog.dart';
 
 /// Welfare Risk Analytics console.
 ///
@@ -87,11 +86,6 @@ class _HrRiskAnalyticsScreenState extends State<HrRiskAnalyticsScreen> {
         title: const Text('Welfare Risk Analytics',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_ethernet, size: 20),
-            tooltip: 'ML service endpoint',
-            onPressed: () => MlSettingsDialog.show(context),
-          ),
           IconButton(
             icon: _isScoring
                 ? const SizedBox(

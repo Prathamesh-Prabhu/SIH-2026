@@ -8,7 +8,6 @@ import '../data/badges.dart';
 import '../services/auth_service.dart';
 import '../services/db_service.dart';
 import '../services/supabase_service.dart';
-import '../widgets/supabase_settings_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -196,8 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Backend Connection',
                       subtitle: supabase.isMockMode
                           ? 'Demo / offline fallback mode'
-                          : 'Connected • ${supabase.currentUrl}',
-                      onTap: () => SupabaseSettingsDialog.show(context),
+                          : 'Connected',
+                      onTap: () {},
                     ),
                     const Divider(height: 1),
                     _settingsTile(
