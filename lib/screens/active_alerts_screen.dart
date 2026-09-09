@@ -212,12 +212,12 @@ class _ActiveAlertsScreenState extends State<ActiveAlertsScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  online
-                      ? 'XGBoost behavioural ensemble · /api/v1/score/batch'
-                      : 'Start ml_service (port 8000) — no heuristic substitution',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF414844)),
-                ),
+                  Text(
+                    online
+                        ? 'XGBoost behavioural ensemble · /api/v1/score/batch'
+                        : 'Connect to ML service: live model scoring required',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF414844)),
+                  ),
               ],
             ),
           ),
@@ -445,7 +445,7 @@ class _ActiveAlertsScreenState extends State<ActiveAlertsScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          const Text('Aggregated from this batch only — no unit history',
+          const Text('Aggregated from this batch only: no unit history',
               style: TextStyle(fontSize: 11, color: _muted)),
           const SizedBox(height: 14),
           if (rows.isEmpty)
@@ -596,7 +596,7 @@ class _ActiveAlertsScreenState extends State<ActiveAlertsScreen> {
             child: OutlinedButton.icon(
               onPressed: () => _report(open),
               icon: const Icon(Icons.notifications_active_outlined, size: 17),
-              label: Text('Notify Welfare Officer — all ${open.length} flagged'),
+              label: Text('Notify Welfare Officer: all ${open.length} flagged'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _ink,
                 side: const BorderSide(color: Color(0xFFC1C8C2)),
@@ -740,7 +740,7 @@ class _ActiveAlertsScreenState extends State<ActiveAlertsScreen> {
                                 color: f.isRiskIncreasing ? _coral : _green)),
                         Expanded(
                           child: Text(
-                            '${f.displayTitle} — ${f.contextDetail}',
+                            '${f.displayTitle}: ${f.contextDetail}',
                             style: const TextStyle(fontSize: 11, height: 1.3, color: Color(0xFF333C36)),
                           ),
                         ),

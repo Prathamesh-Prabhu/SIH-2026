@@ -62,10 +62,10 @@ class _MlSettingsDialogState extends State<MlSettingsDialog> {
       _feedbackIsError = !ok;
       _feedback = ok
           ? 'Connected. ${_ml.statusMessage}'
-          : 'Could not reach the service. Confirm `python ml_service/run_server.py` '
-              'is running and the host is reachable from this device.';
+          : 'Could not reach the service. Please verify your connection or service status.';
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -167,13 +167,13 @@ class _MlSettingsDialogState extends State<MlSettingsDialog> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Zero-paste: start-backends.ps1 automatically syncs Cloudflare URLs to Supabase.\n'
-              'Manual entry is only needed for overrides.',
+              'Service endpoint is managed automatically via cloud configuration.',
               style: TextStyle(
                   fontSize: 11,
                   color: AppColors.onSurfaceVariant,
                   height: 1.4),
             ),
+
             if (_feedback != null) ...[
               const SizedBox(height: 12),
               Container(

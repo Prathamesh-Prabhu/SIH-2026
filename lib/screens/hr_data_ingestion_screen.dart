@@ -192,7 +192,7 @@ CAPF-90112,UNIT-104,High Altitude Outpost,86,52,27,5,2,5,2,3''';
       messenger.showSnackBar(SnackBar(
         backgroundColor: _green,
         content: Text(
-          'Committed — ${res['newCount']} new, ${res['updatedCount']} updated. '
+          'Committed: ${res['newCount']} new, ${res['updatedCount']} updated. '
           'Database: ${res['cohortSize']} personnel.',
         ),
       ));
@@ -303,8 +303,9 @@ CAPF-90112,UNIT-104,High Altitude Outpost,86,52,27,5,2,5,2,3''';
                 SizedBox(height: 6),
                 Text(
                   'Optional: unit_code,  deployment_zone,  consecutive_days\n'
-                  'Wellness pulse (1–5): workload_perception,  sleep_quality,\n'
+                  'Wellness pulse (1-5): workload_perception,  sleep_quality,\n'
                   'exhaustion,  mood_rating,  manager_relationship,  peer_support',
+
                   style: TextStyle(fontSize: 11, height: 1.4, color: _muted),
                 ),
               ],
@@ -353,7 +354,7 @@ CAPF-90112,UNIT-104,High Altitude Outpost,86,52,27,5,2,5,2,3''';
                           if (rows != null) '${rows.length - 1} data rows',
                           _isExcel ? 'XLSX' : 'CSV',
                         ].join('  ·  ')
-                      : '.csv, .xlsx or .xls — parsed on this device',
+                      : '.csv, .xlsx or .xls: parsed on this device',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 11.5, color: _muted),
                 ),

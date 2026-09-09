@@ -114,8 +114,8 @@ class _TaraSettingsDialogState extends State<TaraSettingsDialog> {
                   Expanded(
                     child: Text(
                       secure
-                          ? 'Secure context — microphone allowed'
-                          : 'Not a secure context — voice mic will be blocked (text chat still works)',
+                          ? 'Secure context: microphone allowed'
+                          : 'Not a secure context: voice mic will be blocked (text chat still works)',
                       style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, height: 1.35),
                     ),
                   ),
@@ -129,7 +129,7 @@ class _TaraSettingsDialogState extends State<TaraSettingsDialog> {
               keyboardType: TextInputType.url,
               decoration: const InputDecoration(
                 labelText: 'Relay URL',
-                hintText: 'https://xxxx.trycloudflare.com',
+                hintText: 'https://...',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -163,10 +163,10 @@ class _TaraSettingsDialogState extends State<TaraSettingsDialog> {
             ],
             const SizedBox(height: 12),
             const Text(
-              'Zero-paste: start-backends.ps1 automatically syncs Cloudflare URLs to Supabase.\n'
-              'Manual entry above is only needed for custom overrides.',
+              'Service endpoint is managed automatically via cloud configuration.',
               style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, height: 1.4),
             ),
+
 
             if (_feedback != null) ...[
               const SizedBox(height: 12),

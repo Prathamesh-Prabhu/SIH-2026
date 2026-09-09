@@ -306,8 +306,9 @@ class _AiCoachCard extends StatelessWidget {
                             color: Colors.white)),
                     SizedBox(height: 3),
                     Text(
-                      'Your calm voice companion — just talk out loud about '
+                      'Your calm voice companion: just talk out loud about '
                       'your day, your duty, or whatever\'s on your mind.',
+
                       style: TextStyle(
                           fontSize: 11.5, color: Colors.white, height: 1.35),
                     ),

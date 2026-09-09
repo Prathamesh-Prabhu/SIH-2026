@@ -138,7 +138,7 @@ class _OversightBoardScreenState extends State<OversightBoardScreen> {
           Expanded(
             child: Text(
               'Model-level review only. This console carries no personnel '
-              'records, pseudonym tokens, or individual risk bands — the board '
+              'records, pseudonym tokens, or individual risk bands: the board '
               'governs the model, not the people it scores.',
               style: AppText.bodySm,
             ),
@@ -282,7 +282,7 @@ class _OversightBoardScreenState extends State<OversightBoardScreen> {
               style: AppText.headlineSm),
           const SizedBox(height: AppSpacing.xxs),
           Text(
-            'Derived rolling-window features only — no raw HR records, no '
+            'Derived rolling-window features only: no raw HR records, no '
             'identities, no free-text journal content.',
             style: AppText.bodySm,
           ),

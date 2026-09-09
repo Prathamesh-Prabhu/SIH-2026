@@ -182,7 +182,8 @@ class _HrRiskAnalyticsScreenState extends State<HrRiskAnalyticsScreen> {
         '${elevatedPct.toStringAsFixed(1)}% of the scored cohort is elevated.',
       ],
       footnote:
-          'Tokens only — no names, Service IDs or raw scores are rendered on this board.',
+          'Tokens only: no names, Service IDs or raw scores are rendered on this board.',
+
     );
   }
 

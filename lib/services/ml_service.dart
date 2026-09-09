@@ -146,7 +146,7 @@ class MlService extends ChangeNotifier {
 
     _isOnline = false;
     _statusMessage =
-        'ML service offline — using on-device fallback heuristics';
+        'ML service offline: using on-device fallback heuristics';
     _isChecking = false;
     notifyListeners();
     return false;
@@ -319,7 +319,8 @@ class MlService extends ChangeNotifier {
     if (_isOnline) {
       _isOnline = false;
       _statusMessage =
-          'ML service offline — using on-device fallback heuristics';
+          'ML service offline: using on-device fallback heuristics';
+
       notifyListeners();
     }
   }

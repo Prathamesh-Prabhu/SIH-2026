@@ -147,7 +147,8 @@ class _DoodleCanvasState extends State<DoodleCanvas> {
           '${dir.path}/manofit-doodle-$slug-${DateTime.now().millisecondsSinceEpoch}.png');
       await file.writeAsBytes(bytes.buffer.asUint8List());
       await Share.shareXFiles([XFile(file.path)],
-          text: 'My ManoFit doodle — ${_doodle.title}');
+          text: 'My ManoFit doodle: ${_doodle.title}');
+
       widget.onSaved?.call();
     } catch (e) {
       if (mounted) {

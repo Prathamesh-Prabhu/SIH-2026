@@ -172,7 +172,7 @@ class _TaraScreenState extends State<TaraScreen> {
             const SizedBox(height: 10),
             const Text(
               "You don't have to hold this alone. Tele-MANAS has trained "
-              'counsellors ready right now — free, confidential, 24/7.',
+              'counsellors ready right now (free, confidential, 24/7).',
               style: TextStyle(
                   fontSize: 13, color: Color(0xFFC9D6D0), height: 1.5),
             ),
@@ -312,7 +312,7 @@ class _TaraScreenState extends State<TaraScreen> {
               const Align(
                 alignment: Alignment.bottomCenter,
                 child: _MicHint(
-                  text: 'Microphone permission was denied — grant it in '
+                  text: 'Microphone permission was denied: grant it in '
                       'Settings and reload for voice. Text chat still works.',
                 ),
               )
@@ -320,9 +320,8 @@ class _TaraScreenState extends State<TaraScreen> {
               const Align(
                 alignment: Alignment.bottomCenter,
                 child: _MicHint(
-                  text: 'Tara is loading from a non-secure address, so voice '
-                      'mic stays blocked. Use adb reverse + a localhost '
-                      'TARA_URL. Text chat still works.',
+                  text: 'Tara requires a secure HTTPS connection for microphone access. '
+                      'Text chat is still available.',
                 ),
               ),
           ],
@@ -354,8 +353,8 @@ class _TaraChatSheetState extends State<_TaraChatSheet> {
   final _scroll = ScrollController();
   final List<_ChatMsg> _messages = [
     _ChatMsg('assistant',
-        "Hey, I'm Tara. Whatever's on your mind — the day, the duty, "
-        "something heavier — I'm here. What's going on?"),
+        "Hey, I'm Tara. Whatever's on your mind: the day, the duty, "
+        "or something heavier, I'm here. What's going on?"),
   ];
   bool _sending = false;
 
@@ -590,9 +589,8 @@ class _ErrorPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Start it with:  cd SIH-2026/tara_service && npm start\n'
-              'For a USB device also run:  adb reverse tcp:3000 tcp:3000\n\n'
-              'URL: ${TaraConfig.url}\n$message',
+              'Unable to reach the Tara service.\n'
+              'Please verify your connection and service status.\n\n$message',
               textAlign: TextAlign.center,
               style: const TextStyle(
                   fontSize: 12, color: Color(0xFF8AA79C), height: 1.5),

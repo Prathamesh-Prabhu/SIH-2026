@@ -39,7 +39,7 @@ const List<StreakRank> kStreakRanks = [
     minStreak: 3,
     icon: Icons.military_tech_outlined,
     color: Color(0xFF6C8F7F),
-    motto: 'Showing up is a skill — and you have it.',
+    motto: 'Showing up is a skill, and you have it.',
   ),
   StreakRank(
     name: 'Trooper',
@@ -201,7 +201,7 @@ const List<MilestoneBadge> kMilestoneBadges = [
   MilestoneBadge(
     id: 'reached_out',
     name: 'Reached Out',
-    blurb: 'Talk to Tara — asking for support is strength.',
+    blurb: 'Talk to Tara: asking for support is strength.',
     icon: Icons.graphic_eq_rounded,
     color: Color(0xFF9ED1C3),
     goal: 1,

@@ -56,7 +56,7 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${widget.cadence.title} saved — ${_items.length} of ${_items.length} answered.',
+              '${widget.cadence.title} saved: ${_items.length} of ${_items.length} answered.',
               style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
@@ -73,7 +73,7 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
             if (!ok) ...[
               const SizedBox(height: 10),
               const Text(
-                'Saved on this device — it will sync when the connection is restored.',
+                'Saved on this device, it will sync when the connection is restored.',
                 style: TextStyle(
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
@@ -164,7 +164,7 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                         size: 14, color: AppColors.onSecondaryContainer),
                     const SizedBox(width: 4),
                     const Flexible(
-                      child: Text('Private — not visible to your unit',
+                      child: Text('Private: not visible to your unit',
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,

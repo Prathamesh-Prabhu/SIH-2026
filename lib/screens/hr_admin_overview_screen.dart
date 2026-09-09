@@ -605,8 +605,9 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
               Expanded(
                 child: Text(
                   'Rosters are pseudonymised (SHA-256) on ingestion. HR Admins see '
-                  'aggregate cohort roll-ups only — individual casework is the '
+                  'aggregate cohort roll-ups only: individual casework is the '
                   'Welfare Officer\'s remit.',
+
                   style: TextStyle(fontSize: 11.5, height: 1.35, color: HrAdminOverviewScreen._muted),
                 ),
               ),

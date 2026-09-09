@@ -53,11 +53,12 @@ class _CheckInsHubScreenState extends State<CheckInsHubScreen> {
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
           children: [
             const Text(
-              'Answer these as they come due. They are private — pseudonymised '
+              'Answer these as they come due. They are private: pseudonymised '
               'before they reach welfare analytics, never shown back to you or '
               'your chain of command.',
               style: TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.onSurfaceVariant),
             ),
+
             const SizedBox(height: 18),
             for (final c in CheckInCadence.values) ...[
               _cadenceCard(c),

@@ -242,7 +242,7 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
-                        'Verified government system. Only data required for your welfare support is collected — there is no command-chain access to your check-ins.',
+                        'Verified government system. Only data required for your welfare support is collected; there is no command-chain access to your check-ins.',
                         style: TextStyle(
                             fontSize: 11, color: AppColors.onSurfaceVariant),
                       ),
@@ -256,7 +256,7 @@ class _LoginServiceIdScreenState extends State<LoginServiceIdScreen> {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Demo mode — quick-fill personas:',
+                    'Demo mode: quick-fill personas:',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

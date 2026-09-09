@@ -45,7 +45,8 @@ const List<CheckInItem> kWellbeingCheckIns = [
       'Very manageable',
       'Mostly manageable',
       'Demanding, but coping',
-      'Heavy — starting to strain',
+      'Heavy: starting to strain',
+
       'Overwhelming',
     ],
   ),

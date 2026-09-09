@@ -18,7 +18,8 @@ extension CheckInCadenceX on CheckInCadence {
       };
 
   String get blurb => switch (this) {
-        CheckInCadence.daily => 'A quick read on today — 3 questions',
+        CheckInCadence.daily => 'A quick read on today: 3 questions',
+
         CheckInCadence.weekly => 'The full six-domain check-in',
         CheckInCadence.monthly => 'A deeper look back over the month',
       };

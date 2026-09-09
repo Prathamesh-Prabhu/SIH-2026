@@ -583,8 +583,9 @@ class _RankHero extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             next == null
-                ? 'Top rank reached — ${rank.motto}'
+                ? 'Top rank reached: ${rank.motto}'
                 : '$toGo more ${toGo == 1 ? 'day' : 'days'} to ${next!.name}. ${rank.motto}',
+
             style: TextStyle(
                 fontSize: 11.5,
                 height: 1.4,

@@ -35,8 +35,9 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
                   const SizedBox(height: 6),
                   const Text(
-                    'Ingest a roster through the Tier 2 portal first — the most '
+                    'Ingest a roster through the Tier 2 portal first: the most '
                     'recent committed batch appears here for duty-officer sign-off.',
+
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, height: 1.4, color: AppColors.onSurfaceVariant),
                   ),

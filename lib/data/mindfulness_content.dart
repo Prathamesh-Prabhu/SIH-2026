@@ -96,7 +96,8 @@ const List<BreathingPattern> kBreathingPatterns = [
     ratio: '4-7-8',
     tag: 'Sleep',
     blurb:
-        'A longer exhale tells the vagus nerve you are safe — useful for winding down and falling asleep.',
+        'A longer exhale tells the vagus nerve you are safe, useful for winding down and falling asleep.',
+
     phases: [
       BreathPhase('Breathe in', 4),
       BreathPhase('Hold', 7),

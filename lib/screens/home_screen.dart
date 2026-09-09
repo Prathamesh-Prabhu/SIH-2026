@@ -216,8 +216,9 @@ class HomeScreen extends StatelessWidget {
                     iconBg: AppColors.primaryContainer.withValues(alpha: 0.12),
                     iconColor: AppColors.primaryContainer,
                     title: 'Talk to Tara',
-                    subtitle: 'Voice or text — your calm companion',
+                    subtitle: 'Voice or text: your calm companion',
                     onTap: () => context.push('/tara'),
+
                   ),
                   _actionCard(
                     context: context,

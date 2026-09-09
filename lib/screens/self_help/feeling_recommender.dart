@@ -80,7 +80,7 @@ FeelingSuggestion analyzeFeeling(String raw) {
   ])) {
     return const FeelingSuggestion(
       empathyNote:
-          'That surge is frightening, but it is your alarm system misfiring — not danger. Anchoring your senses in the room right now will bring your body back down.',
+          'That surge is frightening, but it is your alarm system misfiring, not danger. Anchoring your senses in the room right now will bring your body back down.',
       tool: RecommendedTool.grounding,
       activity: TailoredActivity(
         'Palms & Feet Reset',
@@ -90,7 +90,7 @@ FeelingSuggestion analyzeFeeling(String raw) {
           'Press both feet flat and feel the floor take your weight.',
           'Push your palms together firmly for 5 seconds, then release.',
           'Name 3 things you can see and 1 sound you can hear, out loud.',
-          'Slow the exhale — out longer than in — for six breaths.',
+          'Slow the exhale (out longer than in) for six breaths.',
         ],
       ),
     );
@@ -205,7 +205,7 @@ FeelingSuggestion analyzeFeeling(String raw) {
   ])) {
     return const FeelingSuggestion(
       empathyNote:
-          'When everything feels heavy, the goal is not to fix the day — just to give your system one small, kind, low-effort moment.',
+          'When everything feels heavy, the goal is not to fix the day, just to give your system one small, kind, low-effort moment.',
       tool: RecommendedTool.sounds,
       doodleId: 12,
       activity: TailoredActivity(
@@ -214,7 +214,7 @@ FeelingSuggestion analyzeFeeling(String raw) {
         'Lower the bar all the way down.',
         [
           'Start a soundscape and put it on low in the background.',
-          'Trace the cozy-cabin doodle slowly — no need to finish it.',
+          'Trace the cozy-cabin doodle slowly, no need to finish it.',
           'Get a glass of water or a warm drink.',
           'That was enough. You showed up.',
         ],
@@ -225,7 +225,7 @@ FeelingSuggestion analyzeFeeling(String raw) {
   // Fallback.
   return const FeelingSuggestion(
     empathyNote:
-        'Thank you for putting it into words. Try one of the tools below — a few slow minutes with any of them will shift how your body feels.',
+        'Thank you for putting it into words. Try one of the tools below: a few slow minutes with any of them will shift how your body feels.',
     tool: RecommendedTool.breathing,
     doodleId: 1,
   );

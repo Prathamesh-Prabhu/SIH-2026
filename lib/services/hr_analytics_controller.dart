@@ -31,7 +31,8 @@ class HrAnalyticsController extends ChangeNotifier {
   int get cohortSize => _db.hrFeatureRecords.length;
 
   String get modelVersion =>
-      _result?.results.isNotEmpty == true ? _result!.results.first.modelVersion : '—';
+      _result?.results.isNotEmpty == true ? _result!.results.first.modelVersion : '-';
+
 
   /// Unit code the roster recorded for a pseudonym token.
   String unitForToken(String token) => _db.unitForToken(token);
