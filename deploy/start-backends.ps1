@@ -65,27 +65,33 @@ function Sync-EndpointsToSupabase($rawMl, $rawTara) {
   $sbUrl = $sbUrl -replace '/rest/v1/?$', ''
   $sbUrl = $sbUrl.TrimEnd('/')
 
-  $bodyJson = '[{"key":"ml_url","value":"' + $rawMl + '"},{"key":"tara_url","value":"' + $rawTara + '"}]'
-  $endpoint = "$sbUrl/rest/v1/system_config"
+  $headers = @{
+    "apikey" = $sbKey
+    "Authorization" = "Bearer $sbKey"
+    "Content-Type" = "application/json"
+    "Prefer" = "resolution=merge-duplicates"
+  }
+  $body = @(
+    @{ key = "ml_url"; value = $rawMl },
+    @{ key = "tara_url"; value = $rawTara }
+  ) | ConvertTo-Json -Compress
 
-  # Upsert into system_config using curl.exe
-  $out = curl.exe -s -w "%{http_code}" -X POST "$endpoint" `
-    -H "apikey: $sbKey" `
-    -H "Authorization: Bearer $sbKey" `
-    -H "Content-Type: application/json" `
-    -H "Prefer: resolution=merge-duplicates" `
-    -d "$bodyJson"
-
-  if ($out -match '201|200|204') {
+  try {
+    $null = Invoke-RestMethod -Uri "$sbUrl/rest/v1/system_config" -Headers $headers -Method Post -Body $body
     Write-Host "`n=== Dynamic Supabase Service Discovery ===" -ForegroundColor Green
     Write-Host "[OK] Live ML and Tara URLs synced to Supabase successfully!" -ForegroundColor Green
-    Write-Host "     Mobile app will connect automatically -- NO pasting required.`n" -ForegroundColor Cyan
-  } elseif ($out -match 'PGRST205|404') {
-    Write-Host "`n[NOTE] Supabase table 'system_config' not found yet." -ForegroundColor Yellow
-    Write-Host "       Run the 1-time script 'SIH-2026\supabase_migration_system_config.sql' in your Supabase SQL Editor" -ForegroundColor Yellow
-    Write-Host "       to enable 100% zero-paste automatic mobile connection.`n" -ForegroundColor Yellow
+    Write-Host "     Mobile app will connect automatically: no manual pasting required.`n" -ForegroundColor Cyan
+  } catch {
+    $err = $_.Exception.Message
+    if ($err -match '404|PGRST205') {
+      Write-Host "`n[NOTE] Supabase table 'system_config' not found yet." -ForegroundColor Yellow
+      Write-Host "       Run the 1-time script 'SIH-2026\supabase_migration_system_config.sql' in your Supabase SQL Editor`n" -ForegroundColor Yellow
+    } else {
+      Write-Warning "Could not sync endpoints to Supabase: $err"
+    }
   }
 }
+
 
 if ($Lan) {
   $ip = (Get-NetIPAddress -AddressFamily IPv4 |

@@ -4,6 +4,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/app_constants.dart';
+import '../core/tara_config.dart';
+import 'ml_service.dart';
 
 class SupabaseService extends ChangeNotifier {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -89,7 +91,7 @@ class SupabaseService extends ChangeNotifier {
   }
 
   /// Queries the `system_config` table for dynamic service endpoints
-  /// published by start-backends.ps1. Gracefully fails if offline or not yet migrated.
+  /// published by cloud hosting or start-backends.ps1. Gracefully fails if offline.
   Future<Map<String, String>> fetchSystemEndpoints() async {
     final result = <String, String>{};
     if (_client == null || _isMockMode) return result;
@@ -98,7 +100,7 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('system_config')
           .select('key, value')
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 8));
 
       for (final row in response) {
         final k = row['key']?.toString();
@@ -108,11 +110,13 @@ class SupabaseService extends ChangeNotifier {
         }
       }
 
-      if (result.containsKey('ml_url')) {
-        _remoteMlUrl = result['ml_url'];
+      if (result.containsKey('ml_url') && result['ml_url']!.isNotEmpty) {
+        _remoteMlUrl = result['ml_url']!;
+        MlService().syncFromSupabase(_remoteMlUrl!);
       }
-      if (result.containsKey('tara_url')) {
-        _remoteTaraUrl = result['tara_url'];
+      if (result.containsKey('tara_url') && result['tara_url']!.isNotEmpty) {
+        _remoteTaraUrl = result['tara_url']!;
+        TaraConfig.syncFromSupabase(_remoteTaraUrl!);
       }
       dev.log('ManoFit Supabase: discovered endpoints -> ML: $_remoteMlUrl, Tara: $_remoteTaraUrl');
       notifyListeners();

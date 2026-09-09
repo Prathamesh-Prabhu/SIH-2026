@@ -49,11 +49,12 @@ class _TaraScreenState extends State<TaraScreen> {
     _micGranted = status.isGranted;
 
     final sb = context.read<SupabaseService>();
+    if (sb.remoteTaraUrl == null || sb.remoteTaraUrl!.isEmpty) {
+      await sb.fetchSystemEndpoints();
+    }
     if (sb.remoteTaraUrl != null && sb.remoteTaraUrl!.isNotEmpty) {
       TaraConfig.syncFromSupabase(sb.remoteTaraUrl!);
     }
-
-
 
     final controller = WebViewController.fromPlatformCreationParams(
       const PlatformWebViewControllerCreationParams(),
@@ -94,12 +95,17 @@ class _TaraScreenState extends State<TaraScreen> {
     if (mounted) setState(() => _controller = controller);
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     setState(() {
       _error = null;
       _loading = true;
       _crisisHandled = false;
     });
+    final sb = context.read<SupabaseService>();
+    await sb.fetchSystemEndpoints();
+    if (sb.remoteTaraUrl != null && sb.remoteTaraUrl!.isNotEmpty) {
+      TaraConfig.syncFromSupabase(sb.remoteTaraUrl!);
+    }
     _controller?.loadRequest(Uri.parse(TaraConfig.url));
   }
 
