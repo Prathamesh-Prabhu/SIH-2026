@@ -44,13 +44,22 @@ class WelfareEnsembleEngine:
         # 1. Behavioral Model Probability & Factor Attributions
         prob_behavioral, top_factors = self.behavioral_model.predict_risk_probability(features)
 
-        # 2. Integrate NLP Sentiment Score (if provided)
+        # 2. Integrate NLP Sentiment Score, when there is one.
+        #
+        # Companion transcripts are opt-in, so most personnel have no
+        # conversational signal at all. Treating "absent" as 0.0 and still
+        # multiplying the behavioural score by 0.75 caps such a person at 0.75
+        # and pushes them a whole band down — it penalises silence, which is
+        # backwards for a welfare screen. So the weights are renormalised over
+        # the signals actually present.
         nlp_score = request.recent_nlp_sentiment_score
         if nlp_score is None:
-            nlp_score = features.nlp_stress_trend_score or 0.0
+            nlp_score = features.nlp_stress_trend_score
 
-        # Weighted combination: 75% behavioral/operational history + 25% longitudinal conversational sentiment
-        combined_risk_index = (0.75 * prob_behavioral) + (0.25 * nlp_score)
+        if nlp_score is None or nlp_score <= 0.0:
+            combined_risk_index = prob_behavioral
+        else:
+            combined_risk_index = (0.75 * prob_behavioral) + (0.25 * nlp_score)
 
         # 3. Crisis Override: If an acute crisis cue was detected, immediately elevate
         crisis_flag = request.recent_crisis_cue_detected
@@ -66,14 +75,32 @@ class WelfareEnsembleEngine:
             ))
 
         # 4. Map to Categorical Clinical Risk Band (Strictly Low, Moderate, Elevated)
-        if combined_risk_index >= settings.RISK_THRESHOLD_ELEVATED:
+        #
+        # The ELEVATED cut follows the operating point the model actually
+        # learned on held-out data (sensitivity target in
+        # PredictiveBehavioralModel.TARGET_RECALL), falling back to the static
+        # config threshold when the model has not been trained. A hard-coded
+        # 0.65 would silently drift away from the trained model on every
+        # retrain, which is precisely what the §5 recalibration loop exists to
+        # prevent.
+        elevated_cut = settings.RISK_THRESHOLD_ELEVATED
+        learned = getattr(self.behavioral_model, "operating_threshold", None)
+        if self.behavioral_model.model is not None and learned:
+            elevated_cut = float(learned)
+        moderate_cut = settings.RISK_THRESHOLD_MODERATE
+        learned_moderate = getattr(self.behavioral_model, "moderate_threshold", None)
+        if self.behavioral_model.model is not None and learned_moderate:
+            moderate_cut = float(learned_moderate)
+        moderate_cut = min(moderate_cut, elevated_cut)
+
+        if combined_risk_index >= elevated_cut:
             risk_band = RiskBand.ELEVATED
             recommendation = (
                 "Priority confidential outreach by unit Welfare Officer. "
                 "Schedule supportive 1-on-1 check-in; evaluate leave rescheduling and workload relief. "
                 "Non-disciplinary, welfare-first pathway."
             )
-        elif combined_risk_index >= settings.RISK_THRESHOLD_MODERATE:
+        elif combined_risk_index >= moderate_cut:
             risk_band = RiskBand.MODERATE
             recommendation = (
                 "Proactive wellness check-in recommended. Suggest peer-support engagement, "
@@ -83,8 +110,22 @@ class WelfareEnsembleEngine:
             risk_band = RiskBand.LOW
             recommendation = "Operational workload and wellness indicators within stable baseline. Continue routine monitoring."
 
-        # Calculate confidence band
-        confidence = float(np.clip(1.0 - (2.0 * abs(0.5 - combined_risk_index)), 0.65, 0.98))
+        # Confidence = how far the score sits from the nearest band boundary.
+        #
+        # The previous formula peaked at an index of 0.5 and fell away towards
+        # the extremes, so the most clear-cut cases were reported as the LEAST
+        # confident and the most ambiguous as the most confident — exactly
+        # inverted for a Welfare Officer triaging a case list. A score sitting
+        # right on a cut is the uncertain one; a score far from every cut is not.
+        if crisis_flag:
+            # An explicit crisis cue is not a borderline inference.
+            confidence = 0.98
+        else:
+            distance = min(
+                abs(combined_risk_index - moderate_cut),
+                abs(combined_risk_index - elevated_cut),
+            )
+            confidence = float(np.clip(0.55 + (1.6 * distance), 0.55, 0.98))
 
         return RiskAssessmentResponse(
             pseudonym_token=request.pseudonym_token,

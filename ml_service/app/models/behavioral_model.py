@@ -4,7 +4,15 @@ from typing import Any, Dict, List, Optional, Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 try:
     import xgboost as xgb
@@ -51,39 +59,74 @@ class PredictiveBehavioralModel:
         "nlp_stress_trend_score": "Conversational Stress Signal"
     }
 
+    #: Sensitivity target for the ELEVATED band — see `_select_operating_threshold`.
+    TARGET_RECALL = 0.80
+
+    #: Sensitivity target for the MODERATE band. Higher recall, lower bar:
+    #: "worth a routine check-in" rather than "needs priority outreach".
+    MODERATE_TARGET_RECALL = 0.95
+
     def __init__(self, model_version: str = "v1.0.0"):
         self.model_version = model_version
         self.model = None
+        self.operating_threshold: float = 0.5
+        self.moderate_threshold: float = 0.35
         self.baseline_feature_means: Dict[str, float] = {}
         self.feature_importances_: Dict[str, float] = {}
         self.model_type = "XGBoost Classifier" if XGB_AVAILABLE else "HistGradientBoosting Classifier (GBDT)"
 
-    def _init_underlying_model(self):
+    def _init_underlying_model(self, scale_pos_weight: float = 1.0):
         if XGB_AVAILABLE:
             return xgb.XGBClassifier(
-                n_estimators=120,
-                max_depth=4,
-                learning_rate=0.07,
-                subsample=0.85,
-                colsample_bytree=0.85,
+                n_estimators=220,
+                max_depth=3,
+                learning_rate=0.05,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                min_child_weight=6,
+                reg_lambda=3.0,
+                reg_alpha=0.5,
+                gamma=0.2,
+                scale_pos_weight=scale_pos_weight,
                 eval_metric="logloss",
                 random_state=42
             )
         else:
             return HistGradientBoostingClassifier(
-                max_iter=120,
-                max_depth=4,
-                learning_rate=0.07,
+                max_iter=220,
+                max_depth=3,
+                learning_rate=0.05,
+                l2_regularization=3.0,
+                min_samples_leaf=25,
+                class_weight="balanced",
                 random_state=42
             )
 
-    def train(self, X: pd.DataFrame, y: np.ndarray) -> Dict[str, float]:
+    def train(
+        self,
+        X: pd.DataFrame,
+        y: np.ndarray,
+        X_eval: Optional[pd.DataFrame] = None,
+        y_eval: Optional[np.ndarray] = None,
+    ) -> Dict[str, float]:
         """
         Trains the gradient boosted tree model and evaluates metrics.
         y is binary risk: 0 = Low/Resilient, 1 = Elevated/Burnout Risk
+
+        Pass [X_eval]/[y_eval] to score on held-out data. Metrics measured on
+        the training set are not evidence of generalisation — a tree can
+        memorise its own training rows — so the pipeline always evaluates on a
+        split the model has never seen.
         """
         X_clean = X[self.FEATURE_NAMES].fillna(0.0)
-        self.model = self._init_underlying_model()
+
+        # Counterweight the class imbalance so the minority (at-risk) class is
+        # not simply predicted away.
+        positives = float(np.sum(y == 1))
+        negatives = float(np.sum(y == 0))
+        scale_pos_weight = (negatives / positives) if positives > 0 else 1.0
+
+        self.model = self._init_underlying_model(scale_pos_weight=scale_pos_weight)
         self.model.fit(X_clean, y)
 
         # Record population baselines for explainability attribution
@@ -97,18 +140,95 @@ class PredictiveBehavioralModel:
             # For HistGradientBoosting, calculate empirical variance as proxy or uniform
             self.feature_importances_ = {col: 1.0 / len(self.FEATURE_NAMES) for col in self.FEATURE_NAMES}
 
-        # Calculate train metrics
-        preds = self.model.predict(X_clean)
+        # Score on held-out data when provided, otherwise fall back to the
+        # training set (and say so via the returned `evaluated_on` marker).
+        if X_eval is not None and y_eval is not None:
+            X_scored = X_eval[self.FEATURE_NAMES].fillna(0.0)
+            y_scored = y_eval
+            evaluated_on = "holdout"
+        else:
+            X_scored = X_clean
+            y_scored = y
+            evaluated_on = "train"
+
+        probs = self.model.predict_proba(X_scored)[:, 1]
+
+        # Operating point: chosen on whatever split we are scoring — held-out
+        # when available, so the threshold is not tuned on memorised rows.
+        # Screening favours sensitivity: the downstream review step is a human
+        # conversation, not a consequence.
+        self.operating_threshold = self._select_operating_threshold(
+            y_scored, probs, target_recall=self.TARGET_RECALL
+        )
+        # Because the classifier is class-weighted, its probabilities are not
+        # calibrated to prevalence — most people sit well above 0.35. Static
+        # band cuts would therefore mark almost everyone MODERATE. Both cuts
+        # are derived from this model's own score distribution instead.
+        self.moderate_threshold = self._select_operating_threshold(
+            y_scored, probs, target_recall=self.MODERATE_TARGET_RECALL
+        )
+        if self.moderate_threshold >= self.operating_threshold:
+            self.moderate_threshold = self.operating_threshold * 0.7
+        return self._evaluate(y_scored, probs, evaluated_on)
+
+    def evaluate(self, X: pd.DataFrame, y: np.ndarray) -> Dict[str, float]:
+        """
+        Scores an already-fitted model without refitting it.
+
+        Used to report train-set metrics alongside held-out ones, so the gap
+        between them is visible without disturbing the fitted model or the
+        operating threshold chosen on the held-out split.
+        """
+        if self.model is None:
+            raise RuntimeError("Model must be trained before evaluate()")
+        X_clean = X[self.FEATURE_NAMES].fillna(0.0)
         probs = self.model.predict_proba(X_clean)[:, 1]
+        return self._evaluate(y, probs, "train")
+
+    def _evaluate(
+        self, y: np.ndarray, probs: np.ndarray, evaluated_on: str
+    ) -> Dict[str, float]:
+        preds = (probs >= self.operating_threshold).astype(int)
 
         metrics = {
             "accuracy": round(float(accuracy_score(y, preds)), 4),
             "precision": round(float(precision_score(y, preds, zero_division=0)), 4),
             "recall": round(float(recall_score(y, preds, zero_division=0)), 4),
             "f1": round(float(f1_score(y, preds, zero_division=0)), 4),
-            "roc_auc": round(float(roc_auc_score(y, probs)), 4)
+            "roc_auc": round(float(roc_auc_score(y, probs)), 4),
+            # Average precision is the honest headline under class imbalance.
+            "pr_auc": round(float(average_precision_score(y, probs)), 4),
+            "operating_threshold": round(float(self.operating_threshold), 4),
+            "moderate_threshold": round(float(self.moderate_threshold), 4),
+            # 1.0 = held out, 0.0 = train-set only. Surfaced on the model card
+            # so the Oversight Board can tell the difference at a glance.
+            "evaluated_on_holdout": 1.0 if evaluated_on == "holdout" else 0.0,
         }
         return metrics
+
+    @staticmethod
+    def _select_operating_threshold(
+        y_true: np.ndarray, probs: np.ndarray, target_recall: float
+    ) -> float:
+        """
+        Highest threshold that still achieves [target_recall].
+
+        Screening for welfare outreach is asymmetric: an unnecessary check-in
+        costs a supportive conversation, a missed case costs a person nobody
+        reached. So we fix sensitivity first and accept the precision it buys,
+        rather than optimising a symmetric metric like F1.
+        """
+        precision, recall, thresholds = precision_recall_curve(y_true, probs)
+        # precision_recall_curve returns len(thresholds) == len(recall) - 1
+        viable = [
+            (thresholds[i], precision[i])
+            for i in range(len(thresholds))
+            if recall[i] >= target_recall
+        ]
+        if not viable:
+            return 0.5
+        # Among thresholds meeting the recall floor, take the most precise.
+        return float(max(viable, key=lambda t: t[1])[0])
 
     def predict_risk_probability(self, features: FeatureSet) -> Tuple[float, List[FactorAttribution]]:
         """
@@ -199,7 +319,9 @@ class PredictiveBehavioralModel:
             "version": self.model_version,
             "baseline_means": self.baseline_feature_means,
             "feature_importances": self.feature_importances_,
-            "model_type": self.model_type
+            "model_type": self.model_type,
+            "operating_threshold": self.operating_threshold,
+            "moderate_threshold": self.moderate_threshold,
         }
         joblib.dump(payload, target_path)
 
@@ -213,4 +335,6 @@ class PredictiveBehavioralModel:
         self.baseline_feature_means = payload.get("baseline_means", {})
         self.feature_importances_ = payload.get("feature_importances", {})
         self.model_type = payload.get("model_type", self.model_type)
+        self.operating_threshold = payload.get("operating_threshold", 0.5)
+        self.moderate_threshold = payload.get("moderate_threshold", 0.35)
         return True

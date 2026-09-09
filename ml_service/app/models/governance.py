@@ -42,13 +42,17 @@ class ModelGovernanceManager:
                 "Model operates exclusively on pseudonymized rolling aggregations; no direct clinical diagnoses.",
                 "Subject to monthly recalibration by Welfare Clinical Review Board.",
                 "Zero cross-linkage to disciplinary or performance evaluation records.",
-                "Phase 1 training labels are rule-based synthetic stand-ins, not clinical "
-                "outcomes. Because those labels are derived from the same features the "
-                "model reads, reported training metrics are near-perfect by construction "
-                "and MUST NOT be read as real-world accuracy. Genuine performance is "
-                "unknown until the Phase 2 clinical-review loop supplies reviewed labels.",
-                "Trained on synthetic bootstrap data only; no real personnel records have "
-                "been seen by this version."
+                "Trained and evaluated on synthetic bootstrap data only; no real "
+                "personnel records have been seen by this version. Reported metrics are "
+                "measured on a held-out 25% split of simulated personnel, so they show "
+                "generalisation within the simulation, NOT real-world accuracy.",
+                "Outcome labels are stochastic draws from a latent simulated welfare "
+                "state, not clinician-reviewed outcomes. Real performance is unknown "
+                "until the Phase 2 clinical-review loop supplies reviewed labels.",
+                "Tuned for sensitivity (recall target 0.80), which deliberately trades "
+                "precision: a meaningful share of flagged personnel will not be at risk. "
+                "Every flag is a prompt for a supportive human check-in, never a "
+                "determination.",
             ],
             last_validated_date=datetime.now().date().isoformat(),
             oversight_board_approved=oversight_approved,

@@ -167,6 +167,25 @@ class SyntheticDataGenerator:
             # Generate companion transcripts (sampled)
             transcript_records.extend(self._generate_transcripts_for_archetype(token, archetype))
 
+        # Clinical-outcome labels, sampled from the latent archetype.
+        #
+        # The causal story: archetype -> (duty pattern, check-ins, transcripts)
+        # AND archetype -> welfare outcome. The model therefore has to infer a
+        # latent state from noisy observations rather than invert a rule.
+        # Probabilities are deliberately non-separable: heavily-loaded people
+        # sometimes cope, and some people decline without the obvious duty
+        # signature ("silent presentations"), which is exactly the false
+        # negative PRD §3.3 cares about.
+        outcome_probability = {
+            "resilient": 0.06,
+            "moderate_strain": 0.34,
+            "elevated_risk": 0.82,
+        }
+        outcome_labels = {
+            token: int(random.random() < outcome_probability[archetype])
+            for token, archetype in personnel_archetypes.items()
+        }
+
         hr_df = pd.DataFrame(hr_records)
         assessments_df = pd.DataFrame(assessment_records)
         transcripts_df = pd.DataFrame(transcript_records)
@@ -190,6 +209,8 @@ class SyntheticDataGenerator:
             "assessments_df": assessments_df,
             "transcripts_df": transcripts_df,
             "nlp_scores": self.compute_nlp_stress_scores(transcripts_df),
+            "outcome_labels": outcome_labels,
+            "archetypes": personnel_archetypes,
             "paths": paths
         }
 
