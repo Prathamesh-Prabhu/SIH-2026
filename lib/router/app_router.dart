@@ -1,4 +1,6 @@
 import 'package:go_router/go_router.dart';
+import '../core/auth/role_access.dart';
+import '../services/auth_service.dart';
 import '../screens/landing_screen.dart';
 import '../screens/login_service_id_screen.dart';
 import '../screens/otp_verification_screen.dart';
@@ -15,10 +17,43 @@ import '../screens/hr_data_ingestion_screen.dart';
 import '../screens/hr_mobile_ingestion_review_screen.dart';
 import '../screens/hr_risk_analytics_screen.dart';
 import '../screens/institutional_resilience_screen.dart';
+import '../screens/oversight_board_screen.dart';
 
 class AppRouter {
+  /// Routes reachable without a session.
+  static const _publicRoutes = {'/landing', '/login'};
+
   static final GoRouter router = GoRouter(
     initialLocation: '/landing',
+    refreshListenable: AuthService(),
+    redirect: (context, state) {
+      final auth = AuthService();
+      final loc = state.matchedLocation;
+      final signedIn = auth.isAuthenticated;
+
+      if (!signedIn) {
+        return _publicRoutes.contains(loc) ? null : '/landing';
+      }
+
+      // Signed in but consent charter not yet accepted.
+      if (!auth.onboardingComplete) {
+        return loc == '/onboarding' ? null : '/onboarding';
+      }
+
+      // Signed in and onboarded — keep them out of the auth funnel, and send
+      // each role to its own console rather than the personnel home.
+      final home = auth.currentRole.homeRoute;
+      if (_publicRoutes.contains(loc) || loc == '/onboarding') {
+        return home;
+      }
+
+      // Structural RBAC (PRD §6.6): a role may only open the routes its
+      // console owns. Deep-linking anything else lands back on its own home.
+      if (!auth.currentRole.canAccess(loc)) {
+        return home;
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/landing',
@@ -83,6 +118,10 @@ class AppRouter {
       GoRoute(
         path: '/resilience',
         builder: (context, state) => const InstitutionalResilienceScreen(),
+      ),
+      GoRoute(
+        path: '/oversight',
+        builder: (context, state) => const OversightBoardScreen(),
       ),
     ],
   );

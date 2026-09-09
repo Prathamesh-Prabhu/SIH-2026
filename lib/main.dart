@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'router/app_router.dart';
@@ -11,6 +12,14 @@ import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load `.env` (bundled as an asset). Missing file is non-fatal — the app
+  // then runs on its resilient mock/demo fallback.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    dotenv.testLoad(fileInput: '');
+  }
 
   final supabaseService = SupabaseService();
   await supabaseService.init();

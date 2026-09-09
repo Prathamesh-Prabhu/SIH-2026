@@ -1,10 +1,17 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/db_service.dart';
-import '../widgets/quick_screen_switcher.dart';
+import 'self_help/ambient_sound_player.dart';
+import 'self_help/breathing_calmer.dart';
+import 'self_help/doodle_canvas.dart';
+import 'self_help/feeling_recommender.dart';
+import 'self_help/grounding_exercise.dart';
+import 'self_help/worry_dissolver.dart';
 
+/// Self-Help Hub — feeling check-in + interactive regulation tools.
+/// Structure & tools ported from mindspace's `SelfHelpPage`.
 class SelfHelpScreen extends StatefulWidget {
   const SelfHelpScreen({super.key});
 
@@ -12,313 +19,89 @@ class SelfHelpScreen extends StatefulWidget {
   State<SelfHelpScreen> createState() => _SelfHelpScreenState();
 }
 
-class _SelfHelpScreenState extends State<SelfHelpScreen> with SingleTickerProviderStateMixin {
+class _SelfHelpScreenState extends State<SelfHelpScreen> {
   final _db = DbService();
+  final _controller = TextEditingController();
 
-  // Box Breathing State (4-4-4-4)
-  bool _breathingActive = false;
-  int _secondsLeft = 4;
-  String _breathPhase = 'Inhale';
-  Timer? _breathTimer;
-  int _cycleCount = 0;
-
-  // Doodle state
-  final List<Offset?> _points = [];
-  Color _selectedColor = AppColors.primary;
+  FeelingSuggestion? _suggestion;
+  bool _analyzing = false;
+  bool _toolDismissed = false;
 
   @override
   void dispose() {
-    _breathTimer?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _startBreathing() {
+  RecommendedTool? get _recommendedTool =>
+      (!_toolDismissed && _suggestion?.tool != null &&
+              _suggestion!.tool != RecommendedTool.doodle)
+          ? _suggestion!.tool
+          : null;
+
+  int? get _recommendedDoodleId => _suggestion?.doodleId;
+
+  Future<void> _analyze([String? preset]) async {
+    final query = (preset ?? _controller.text).trim();
+    if (query.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _analyzing = true);
+    // Local heuristic — kept async so swapping in the LLM later is a drop-in.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
     setState(() {
-      _breathingActive = true;
-      _secondsLeft = 4;
-      _breathPhase = 'Inhale (4s)';
-      _cycleCount = 0;
-    });
-
-    _breathTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-
-      setState(() {
-        _secondsLeft--;
-        if (_secondsLeft <= 0) {
-          _secondsLeft = 4;
-          if (_breathPhase.startsWith('Inhale')) {
-            _breathPhase = 'Hold (4s)';
-          } else if (_breathPhase.startsWith('Hold') && _cycleCount % 2 == 0) {
-            _breathPhase = 'Exhale (4s)';
-            _cycleCount++;
-          } else if (_breathPhase.startsWith('Exhale')) {
-            _breathPhase = 'Hold empty (4s)';
-          } else {
-            _breathPhase = 'Inhale (4s)';
-            _cycleCount++;
-            if (_cycleCount >= 4) {
-              // Completed 2 full box cycles (32s)
-              _breathingActive = false;
-              timer.cancel();
-              _db.recordSelfHelpActivity('breathing', 32);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Box breathing complete! Vagal regulation engaged.'),
-                  backgroundColor: AppColors.secondary,
-                ),
-              );
-            }
-          }
-        }
-      });
-    });
-  }
-
-  void _stopBreathing() {
-    _breathTimer?.cancel();
-    setState(() {
-      _breathingActive = false;
-      _secondsLeft = 4;
-      _breathPhase = 'Inhale';
+      _suggestion = analyzeFeeling(query);
+      _toolDismissed = false;
+      _analyzing = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final tool = _recommendedTool;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.backOr('/home'),
         ),
-        title: const Text('Self-Help Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.spa, size: 14, color: AppColors.onSecondaryContainer),
-                SizedBox(width: 4),
-                Text('Sanctuary', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSecondaryContainer)),
-              ],
-            ),
-          ),
-        ],
+        title: const Text('Self-Help Hub',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Regulate & Reset',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              _feelingCheckIn(),
+              const SizedBox(height: 24),
+
+              if (tool != null) ...[
+                _sectionHeader(
+                  'Recommended for you: ${toolLabel(tool)}',
+                  onDismiss: () => setState(() => _toolDismissed = true),
+                ),
+                const SizedBox(height: 12),
+                _toolFor(tool),
+                const SizedBox(height: 24),
+              ],
+
+              Text(tool != null ? 'Zen Doodling' : 'Zen Doodling',
+                  style: const TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Self-guided tactical restoration tools to defuse operational stress.',
-                style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
-              ),
-              const SizedBox(height: 18),
-
-              // Tactical Box Breathing Interactive Tool
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.air, color: AppColors.primary, size: 24),
-                            ),
-                            const SizedBox(width: 12),
-                            const Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Box Cadence (4-4-4-4)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary)),
-                                Text('Heart rate deceleration', style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondaryContainer.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text('Tactical Vagal', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Breathing Visual Orb
-                    AnimatedContainer(
-                      duration: const Duration(seconds: 1),
-                      width: _breathingActive ? (_breathPhase.startsWith('Inhale') ? 140 : (_breathPhase.startsWith('Exhale') ? 90 : 120)) : 110,
-                      height: _breathingActive ? (_breathPhase.startsWith('Inhale') ? 140 : (_breathPhase.startsWith('Exhale') ? 90 : 120)) : 110,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _breathingActive ? AppColors.secondaryContainer : AppColors.surfaceContainerHigh,
-                        border: Border.all(
-                          color: _breathingActive ? AppColors.secondary : AppColors.outlineVariant,
-                          width: 3,
-                        ),
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _breathingActive ? '$_secondsLeft' : '4s',
-                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primary),
-                            ),
-                            Text(
-                              _breathPhase,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.secondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Button Start / Stop
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _breathingActive ? _stopBreathing : _startBreathing,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _breathingActive ? AppColors.errorContainer : AppColors.primaryContainer,
-                          foregroundColor: _breathingActive ? AppColors.error : Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: Text(
-                          _breathingActive ? 'Stop Exercise' : 'Start 4-4-4-4 Cadence',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                      color: AppColors.primary)),
+              const SizedBox(height: 12),
+              DoodleCanvas(
+                initialDoodleId: _recommendedDoodleId,
+                onSaved: () => _db.recordSelfHelpActivity('doodle', 180),
               ),
               const SizedBox(height: 24),
 
-              // Interactive Doodle Grounding Canvas
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.brush_outlined, color: AppColors.secondary, size: 20),
-                            SizedBox(width: 8),
-                            Text('Grounding Canvas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary)),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            _colorDot(AppColors.primary),
-                            _colorDot(AppColors.secondary),
-                            _colorDot(AppColors.error),
-                            IconButton(
-                              icon: const Icon(Icons.refresh, size: 18, color: AppColors.outline),
-                              onPressed: () => setState(() => _points.clear()),
-                              tooltip: 'Clear Canvas',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Unstructured tactile doodling helps defuse situational cognitive tension.',
-                      style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 12),
-                    // Canvas Area
-                    Container(
-                      height: 180,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: GestureDetector(
-                          onPanUpdate: (details) {
-                            setState(() {
-                              _points.add(details.localPosition);
-                            });
-                          },
-                          onPanEnd: (details) => _points.add(null),
-                          child: CustomPaint(
-                            painter: _DoodlePainter(points: _points, color: _selectedColor),
-                            size: Size.infinite,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Soundscapes List
-              const Text('Restorative Ambient Soundscapes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary)),
-              const SizedBox(height: 10),
-              _soundscapeItem('Rain in Pine Forest', '3 min • Low frequency alpha waves', Icons.forest_outlined),
-              const SizedBox(height: 8),
-              _soundscapeItem('High Altitude Wind', '5 min • White noise grounding', Icons.air_outlined),
-              const SizedBox(height: 8),
-              _soundscapeItem('Himalayan Stream', '4 min • Theta cadence deceleration', Icons.water_outlined),
+              _crisisStrip(),
             ],
           ),
         ),
@@ -326,85 +109,338 @@ class _SelfHelpScreenState extends State<SelfHelpScreen> with SingleTickerProvid
     );
   }
 
-  Widget _colorDot(Color color) {
-    final isSelected = _selectedColor == color;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedColor = color),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        width: 20,
-        height: 20,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: isSelected ? Colors.black : Colors.transparent, width: 2),
-        ),
+  Widget _toolFor(RecommendedTool tool) {
+    switch (tool) {
+      case RecommendedTool.grounding:
+        return GroundingExercise(
+          onCompleted: () => _db.recordSelfHelpActivity('grounding', 240),
+        );
+      case RecommendedTool.breathing:
+        return BreathingCalmer(
+          onCycleCompleted: (c) {
+            if (c == 3) _db.recordSelfHelpActivity('breathing', 90);
+          },
+        );
+      case RecommendedTool.dissolve:
+        return WorryDissolver(
+          onReleased: () => _db.recordSelfHelpActivity('grounding', 120),
+        );
+      case RecommendedTool.sounds:
+        return AmbientSoundPlayer(
+          onPlay: (_) => _db.recordSelfHelpActivity('soundscape', 180),
+        );
+      case RecommendedTool.doodle:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _feelingCheckIn() {
+    final s = _suggestion;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('How are you feeling right now?',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary)),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0EA),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Private',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Type what you're experiencing. We'll suggest a matching tool and a short activity.",
+            style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final q in kQuickFeelings)
+                ActionChip(
+                  label: Text(q.label, style: const TextStyle(fontSize: 11)),
+                  backgroundColor: const Color(0xFFFAF7F2),
+                  side: const BorderSide(color: AppColors.hairline),
+                  onPressed: _analyzing
+                      ? null
+                      : () {
+                          _controller.text = q.query;
+                          _analyze(q.query);
+                        },
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            minLines: 2,
+            maxLines: 4,
+            style: const TextStyle(fontSize: 13),
+            decoration: const InputDecoration(
+              hintText:
+                  "Describe what's on your mind or how your body feels…",
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: _analyzing ? null : () => _analyze(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryContainer,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              icon: _analyzing
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.explore_outlined, size: 16),
+              label: Text(_analyzing
+                  ? 'Analysing…'
+                  : 'Get Activities & Guidance'),
+            ),
+          ),
+          if (s != null && !_analyzing) ...[
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F8F5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFD5E5D8)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.auto_awesome,
+                        color: Colors.white, size: 15),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('GUIDANCE NOTE',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                                color: AppColors.secondary)),
+                        const SizedBox(height: 2),
+                        Text(s.empathyNote,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.primary,
+                                height: 1.5)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (s.activity != null) ...[
+              const SizedBox(height: 12),
+              _activityCard(s.activity!),
+            ],
+          ],
+        ],
       ),
     );
   }
 
-  Widget _soundscapeItem(String title, String subtitle, IconData icon) {
+  Widget _activityCard(TailoredActivity a) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.hairline),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.secondaryContainer.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 20, color: AppColors.secondary),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text('Recommended Activity: ${a.title}',
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary)),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0EA),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(a.duration,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondary)),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          const SizedBox(height: 6),
+          Text(a.description,
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAF7F2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.hairline),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primary)),
-                Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+                const Text('ACTION STEPS',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: AppColors.onSurfaceVariant)),
+                const SizedBox(height: 8),
+                for (var i = 0; i < a.steps.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          margin: const EdgeInsets.only(top: 1),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text('${i + 1}',
+                                style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(a.steps[i],
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppColors.primary)),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.play_circle_fill, color: AppColors.secondary, size: 28),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Playing "$title" ambient track...')),
-              );
-              _db.recordSelfHelpActivity('soundscape', 180);
-            },
           ),
         ],
       ),
     );
   }
-}
 
-class _DoodlePainter extends CustomPainter {
-  final List<Offset?> points;
-  final Color color;
-  _DoodlePainter({required this.points, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 3.0;
-
-    for (int i = 0; i < points.length - 1; i++) {
-      if (points[i] != null && points[i + 1] != null) {
-        canvas.drawLine(points[i]!, points[i + 1]!, paint);
-      }
-    }
+  Widget _sectionHeader(String title, {VoidCallback? onDismiss}) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: const BoxDecoration(
+            color: AppColors.primaryContainer,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.auto_awesome, color: Colors.white, size: 15),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(title,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary)),
+        ),
+        if (onDismiss != null)
+          TextButton.icon(
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close, size: 14),
+            label: const Text('Dismiss'),
+          ),
+      ],
+    );
   }
 
-  @override
-  bool shouldRepaint(covariant _DoodlePainter oldDelegate) => true;
+  Widget _crisisStrip() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_user_outlined,
+              size: 18, color: AppColors.secondary),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Need live human support? Tele-MANAS 14416 is confidential and available 24/7.',
+              style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/companion'),
+            child: const Text('AI Companion'),
+          ),
+        ],
+      ),
+    );
+  }
 }

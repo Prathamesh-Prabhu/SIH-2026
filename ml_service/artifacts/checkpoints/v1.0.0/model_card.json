@@ -1,0 +1,53 @@
+{
+  "model_id": "manofit-risk-v1.0.0",
+  "model_name": "ManoFit Behavioral & Stress Risk Predictive Model",
+  "model_type": "XGBoost Classifier",
+  "version": "v1.0.0",
+  "training_window": "90-day rolling synthetic & anonymized operational records",
+  "sample_size": 375,
+  "features_utilized": [
+    "consecutive_duty_days_max_30d",
+    "avg_shift_hours_30d",
+    "leave_utilization_ratio_30d",
+    "rest_day_deficit_ratio_30d",
+    "high_hardship_exposure_ratio_30d",
+    "avg_sleep_score_30d",
+    "avg_exhaustion_score_30d",
+    "composite_assessment_score_30d",
+    "avg_shift_hours_60d",
+    "leave_utilization_ratio_60d",
+    "composite_assessment_score_60d",
+    "deployment_changes_90d",
+    "days_at_current_deployment",
+    "consecutive_duty_days_max_90d",
+    "leave_utilization_ratio_90d",
+    "transfer_frequency_rate_90d",
+    "training_load_trend_slope",
+    "mood_trend_slope",
+    "workload_trend_slope",
+    "sleep_deterioration_delta",
+    "nlp_stress_trend_score"
+  ],
+  "metrics": {
+    "accuracy": 0.84,
+    "precision": 0.5833,
+    "recall": 0.8077,
+    "f1": 0.6774,
+    "roc_auc": 0.8936,
+    "pr_auc": 0.7193,
+    "operating_threshold": 0.5082,
+    "moderate_threshold": 0.1158,
+    "evaluated_on_holdout": 1.0
+  },
+  "known_limitations": [
+    "Model operates exclusively on pseudonymized rolling aggregations; no direct clinical diagnoses.",
+    "Subject to monthly recalibration by Welfare Clinical Review Board.",
+    "Zero cross-linkage to disciplinary or performance evaluation records.",
+    "Trained and evaluated on synthetic bootstrap data only; no real personnel records have been seen by this version. Reported metrics are measured on a held-out 25% split of simulated personnel, so they show generalisation within the simulation, NOT real-world accuracy.",
+    "Outcome labels are stochastic draws from a latent simulated welfare state, not clinician-reviewed outcomes. Real performance is unknown until the Phase 2 clinical-review loop supplies reviewed labels.",
+    "Tuned for sensitivity (recall target 0.80), which deliberately trades precision: a meaningful share of flagged personnel will not be at risk. Every flag is a prompt for a supportive human check-in, never a determination."
+  ],
+  "last_validated_date": "2026-09-09",
+  "oversight_board_approved": true,
+  "is_active": true
+}

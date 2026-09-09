@@ -46,3 +46,10 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# ML microservice (ml_service/) — Python artifacts and generated data
+ml_service/**/__pycache__/
+ml_service/.env
+ml_service/.venv/
+ml_service/data/*.csv
+ml_service/data/*.jsonl

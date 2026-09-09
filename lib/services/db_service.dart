@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import '../data/wellbeing_checkins.dart';
 import 'auth_service.dart';
 import 'ml_service.dart';
 import 'supabase_service.dart';
@@ -57,6 +58,7 @@ class DbService extends ChangeNotifier {
         'accepted_rows': 514,
         'rejected_rows': 6,
         'status': 'committed',
+        'source': 'CSV Upload',
         'created_at': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
       });
     }
@@ -118,6 +120,13 @@ class DbService extends ChangeNotifier {
       final tier = person['location_tier'] as String? ?? 'PEACE';
       final unit = person['unit_code'] as String? ?? 'UNIT-101';
 
+      // Deployment stints across the window, derived from transfer history, so
+      // the deployment-record features (redeployment frequency, time at the
+      // current posting) receive real values instead of defaulting to zero.
+      final transfers =
+          ((person['transfer_count_last_12m'] as num?)?.toInt() ?? 1).clamp(1, 4);
+      final stintLength = (windowDays / transfers).ceil();
+
       final hrRecords = List.generate(windowDays, (d) {
         final date = today.subtract(Duration(days: windowDays - d));
         // A rest day only appears once the consecutive-duty streak would break.
@@ -134,6 +143,11 @@ class DbService extends ChangeNotifier {
           'consecutive_active_days': isRestDay ? 0 : min(consecutive, d + 1),
           'transfer_count_last_12m':
               (person['transfer_count_last_12m'] as num?)?.toInt() ?? 1,
+          'deployment_id': '$token-DEP-${d ~/ stintLength}',
+          'deployment_start_date': today
+              .subtract(Duration(days: windowDays - (d ~/ stintLength) * stintLength))
+              .toIso8601String()
+              .split('T')[0],
           'training_load_hours': isRestDay ? 0.0 : 2.0,
           'synthetic': true,
         };
@@ -197,35 +211,64 @@ class DbService extends ChangeNotifier {
     return true;
   }
 
-  // --- 2. ASSESSMENTS ---
-  Future<bool> recordAssessment({
-    required int totalScore,
-    required Map<String, dynamic> answers,
-  }) async {
-    final record = {
-      'id': 'asmt-${DateTime.now().millisecondsSinceEpoch}',
-      'user_id': _auth.currentUser?.id ?? 'demo-user',
-      'service_id': _auth.currentUser?.serviceId ?? 'CAPF-8821',
-      'assessment_type': 'PHQ_GAD_WELLBEING',
-      'total_score': totalScore,
-      'question_count': answers.length,
-      'answers': answers,
-      'status': 'completed',
-      'created_at': DateTime.now().toIso8601String(),
+  // --- 2. ASSESSMENTS — the 6 private check-ins (PRD §7) ---
+  /// Persists one wellbeing check-in. [answers] is keyed by the six
+  /// `CheckInItem.key` values, each 1–5, stored both as named columns (what
+  /// the ML layer reads) and in `answers` for provenance.
+  ///
+  /// Returns true when the row reached Supabase (or when running in
+  /// mock/demo mode, where the local cache is the source of truth).
+  Future<bool> recordWellbeingCheckIn(Map<String, int> answers) async {
+    final now = DateTime.now();
+    final total = orientedWellbeingTotal(answers);
+
+    // Columns the analytics layer consumes. Absent answers stay null rather
+    // than being silently defaulted to a neutral 3 — a skipped item is not
+    // the same signal as "average".
+    final scores = <String, dynamic>{
+      for (final item in kWellbeingCheckIns)
+        if (answers[item.key] != null) item.key: answers[item.key],
     };
 
-    _assessments.insert(0, record);
+    final payload = <String, dynamic>{
+      'user_id': _auth.currentUser?.id,
+      'service_id': _auth.currentUser?.serviceId ?? 'CAPF-8821',
+      'assessment_type': 'SIX_CHECKIN_V1',
+      'total_score': total,
+      'question_count': kWellbeingCheckIns.length,
+      'answers': {
+        for (final item in kWellbeingCheckIns)
+          if (answers[item.key] != null)
+            item.key: {
+              'question': item.question,
+              'value': answers[item.key],
+              'label': item.labels[answers[item.key]! - 1],
+              'higher_is_better': item.higherIsBetter,
+            },
+      },
+      'status': 'completed',
+      ...scores,
+    };
+
+    // Local cache keeps its own id/timestamp for the UI; the remote row lets
+    // Postgres generate the uuid PK and created_at.
+    _assessments.insert(0, {
+      ...payload,
+      'id': 'asmt-${now.millisecondsSinceEpoch}',
+      'created_at': now.toIso8601String(),
+    });
     notifyListeners();
 
     final client = _supabase.client;
-    if (client != null && !_supabase.isMockMode) {
-      try {
-        await client.from('assessments').insert(record);
-      } catch (e) {
-        debugPrint('Supabase assessment note: $e');
-      }
+    if (client == null || _supabase.isMockMode) return true;
+
+    try {
+      await client.from('assessments').insert(payload);
+      return true;
+    } catch (e) {
+      debugPrint('Supabase assessment insert failed: $e');
+      return false;
     }
-    return true;
   }
 
   // --- 3. COUNSELING BOOKING ---
@@ -285,6 +328,9 @@ class DbService extends ChangeNotifier {
   Future<Map<String, dynamic>> processHrCsvIngestion({
     required String filename,
     required List<String> lines,
+    /// PRD §2 ingestion tier this batch arrived through, shown per-source on
+    /// the HR console. Tier 2 (bulk upload) is the default path.
+    String source = 'CSV Upload',
   }) async {
     int total = 0;
     int accepted = 0;
@@ -365,6 +411,7 @@ class DbService extends ChangeNotifier {
       'accepted_rows': accepted,
       'rejected_rows': rejected,
       'status': 'committed',
+      'source': source,
       'created_at': DateTime.now().toIso8601String(),
     };
 

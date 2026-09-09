@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
-import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 import '../widgets/supabase_settings_dialog.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -12,26 +12,18 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = AuthService();
+    final auth = context.watch<AuthService>();
     final supabase = SupabaseService();
     final user = auth.currentUser;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.backOr('/home'),
         ),
         title: const Text('Personnel Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.hub_outlined, color: AppColors.secondary),
-            tooltip: 'Supabase Settings',
-            onPressed: () => SupabaseSettingsDialog.show(context),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -171,8 +163,10 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     _settingsTile(
                       icon: Icons.hub_outlined,
-                      title: 'Supabase Connection',
-                      subtitle: supabase.isMockMode ? 'Mock / Demo Fallback Mode' : 'Connected to ${supabase.currentUrl}',
+                      title: 'Backend Connection',
+                      subtitle: supabase.isMockMode
+                          ? 'Demo / offline fallback mode'
+                          : 'Connected • ${supabase.currentUrl}',
                       onTap: () => SupabaseSettingsDialog.show(context),
                     ),
                     const Divider(height: 1),
@@ -180,27 +174,14 @@ class ProfileScreen extends StatelessWidget {
                       icon: Icons.verified_user_outlined,
                       title: 'Data & Privacy Explainer',
                       subtitle: 'DPDP Act 2023 compliance & consent audit ledger',
-                      onTap: () => context.go('/onboarding'),
+                      onTap: () => context.push('/onboarding'),
                     ),
                     const Divider(height: 1),
                     _settingsTile(
-                      icon: Icons.admin_panel_settings_outlined,
-                      title: 'Switch to HR Admin Console',
-                      subtitle: 'Review roster ingestion & validation status',
-                      onTap: () {
-                        auth.switchPersona(UserProfile.sharmaHrAdmin);
-                        context.go('/hr-overview');
-                      },
-                    ),
-                    const Divider(height: 1),
-                    _settingsTile(
-                      icon: Icons.shield_outlined,
-                      title: 'Switch to Commander Resilience',
-                      subtitle: 'Aggregate unit-level wellness index (no individual names)',
-                      onTap: () {
-                        auth.switchPersona(UserProfile.raoCommander);
-                        context.go('/resilience');
-                      },
+                      icon: Icons.badge_outlined,
+                      title: 'Role',
+                      subtitle: (user?.role.displayName ?? 'Personnel'),
+                      onTap: () {},
                     ),
                   ],
                 ),

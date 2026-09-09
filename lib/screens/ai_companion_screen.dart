@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/db_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
 class AiCompanionScreen extends StatefulWidget {
   const AiCompanionScreen({super.key});
@@ -179,11 +178,10 @@ class _AiCompanionScreenState extends State<AiCompanionScreen> with SingleTicker
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.backOr('/home'),
         ),
         title: const Text('AI Companion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
-import '../widgets/quick_screen_switcher.dart';
+import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import '../widgets/supabase_settings_dialog.dart';
 
 class LandingScreen extends StatelessWidget {
@@ -10,9 +11,10 @@ class LandingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMockMode = SupabaseService().isMockMode;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -222,7 +224,7 @@ class LandingScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () => context.go('/login'),
+                  onPressed: () => context.push('/login'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryContainer,
                     foregroundColor: AppColors.onPrimary,
@@ -244,21 +246,29 @@ class LandingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Explore As Personnel Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => context.go('/home'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.outlineVariant),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              // Demo entry — only when no live Supabase backend is configured.
+              if (isMockMode) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final auth = AuthService();
+                      await auth.signInWithServiceId('CAPF-8821', 'demo');
+                      await auth.markOnboardingComplete();
+                      if (context.mounted) context.go('/home');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.outlineVariant),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Explore in Demo Mode (offline)'),
                   ),
-                  child: const Text('Open Personnel Home (Demo)'),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
+              ] else
+                const SizedBox(height: 8),
 
               // Emergency Call Banner (Tele-MANAS)
               Container(

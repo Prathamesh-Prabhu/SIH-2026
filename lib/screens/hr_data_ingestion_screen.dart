@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/db_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
 class HrDataIngestionScreen extends StatefulWidget {
   const HrDataIngestionScreen({super.key});
@@ -54,12 +53,11 @@ CAPF-88220,58,8,Northern Sector''';
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         backgroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/hr-overview'),
+          onPressed: () => context.backOr('/hr-overview'),
         ),
         title: const Text('Data Ingestion • Tier 2 Portal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),

@@ -1,5 +1,6 @@
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/app_constants.dart';
@@ -14,6 +15,7 @@ class SupabaseService extends ChangeNotifier {
   bool _isMockMode = true;
   String _currentUrl = AppConstants.defaultSupabaseUrl;
   String _currentAnonKey = AppConstants.defaultSupabaseKey;
+  String _authEmailDomain = AppConstants.authEmailDomainFallback;
 
   SupabaseClient? get client => _client;
   bool get isInitialized => _isInitialized;
@@ -21,16 +23,41 @@ class SupabaseService extends ChangeNotifier {
   String get currentUrl => _currentUrl;
   String get currentAnonKey => _currentAnonKey;
 
+  /// Domain that Service IDs are mapped onto for email/password auth.
+  String get authEmailDomain => _authEmailDomain;
+
+  /// Normalises a project URL — strips a trailing `/rest/v1/` (a common
+  /// copy-paste from the Supabase API settings page) and any trailing slash.
+  static String _normaliseUrl(String raw) {
+    var url = raw.trim();
+    url = url.replaceFirst(RegExp(r'/rest/v1/?$'), '');
+    if (url.endsWith('/')) url = url.substring(0, url.length - 1);
+    return url;
+  }
+
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _currentUrl = prefs.getString(AppConstants.keySupabaseUrl) ?? AppConstants.defaultSupabaseUrl;
-      _currentAnonKey = prefs.getString(AppConstants.keySupabaseAnonKey) ?? AppConstants.defaultSupabaseKey;
+
+      // Precedence: in-app override (SharedPreferences) → .env → constant.
+      final envUrl = dotenv.maybeGet('SUPABASE_URL') ?? '';
+      final envKey = dotenv.maybeGet('SUPABASE_ANON_KEY') ?? '';
+      _authEmailDomain = (dotenv.maybeGet('AUTH_EMAIL_DOMAIN') ??
+              AppConstants.authEmailDomainFallback)
+          .trim();
+
+      _currentUrl = _normaliseUrl(
+        prefs.getString(AppConstants.keySupabaseUrl) ??
+            (envUrl.isNotEmpty ? envUrl : AppConstants.defaultSupabaseUrl),
+      );
+      _currentAnonKey = (prefs.getString(AppConstants.keySupabaseAnonKey) ??
+              (envKey.isNotEmpty ? envKey : AppConstants.defaultSupabaseKey))
+          .trim();
 
       final looksReal = _currentUrl.startsWith('https://') &&
-          _currentAnonKey.length > 25 &&
-          !_currentAnonKey.contains('dummy') &&
-          !_currentUrl.contains('your-project');
+          _currentUrl.contains('.supabase.co') &&
+          _currentAnonKey.split('.').length == 3 &&
+          _currentAnonKey.length > 60;
 
       if (looksReal) {
         await Supabase.initialize(
@@ -43,7 +70,8 @@ class SupabaseService extends ChangeNotifier {
         dev.log('ManoFit Supabase connected to: $_currentUrl');
       } else {
         _isMockMode = true;
-        dev.log('ManoFit operating in resilient Mock/Demo mode (configure live Supabase in connection settings).');
+        dev.log('ManoFit operating in resilient Mock/Demo mode '
+            '(no valid Supabase credentials in .env or connection settings).');
       }
     } catch (e) {
       dev.log('Supabase initialization error, falling back to mock mode: $e');
@@ -54,7 +82,7 @@ class SupabaseService extends ChangeNotifier {
   }
 
   Future<bool> updateCredentials(String url, String anonKey) async {
-    final cleanUrl = url.trim();
+    final cleanUrl = _normaliseUrl(url);
     final cleanKey = anonKey.trim();
 
     try {

@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
-import '../widgets/quick_screen_switcher.dart';
-import '../widgets/supabase_settings_dialog.dart';
+import '../widgets/exit_confirm_scope.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = AuthService();
+    final auth = context.watch<AuthService>();
     final user = auth.currentUser;
-    final name = user?.fullName ?? 'Constable Dhruv';
+    final name = user?.fullName ?? 'Personnel';
 
-    return Scaffold(
+    return ExitConfirmScope(
+      child: Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         title: Row(
           children: [
@@ -35,11 +35,6 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.hub_outlined, color: AppColors.secondary),
-            tooltip: 'Supabase Settings',
-            onPressed: () => SupabaseSettingsDialog.show(context),
-          ),
-          IconButton(
             icon: const Icon(Icons.notifications_none_rounded, color: AppColors.onSurfaceVariant),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -48,7 +43,7 @@ class HomeScreen extends StatelessWidget {
             },
           ),
           GestureDetector(
-            onTap: () => context.go('/profile'),
+            onTap: () => context.push('/profile'),
             child: CircleAvatar(
               radius: 16,
               backgroundColor: AppColors.primary,
@@ -74,16 +69,16 @@ class HomeScreen extends StatelessWidget {
             case 0:
               break;
             case 1:
-              context.go('/wellbeing');
+              context.push('/wellbeing');
               break;
             case 2:
-              context.go('/companion');
+              context.push('/companion');
               break;
             case 3:
-              context.go('/self-help');
+              context.push('/self-help');
               break;
             case 4:
-              context.go('/profile');
+              context.push('/profile');
               break;
           }
         },
@@ -162,7 +157,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     InkWell(
-                      onTap: () => context.go('/mood'),
+                      onTap: () => context.push('/mood'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -210,7 +205,7 @@ class HomeScreen extends StatelessWidget {
                     iconColor: AppColors.onSecondaryContainer,
                     title: 'Self-Help',
                     subtitle: 'Breathing, doodle & more',
-                    onTap: () => context.go('/self-help'),
+                    onTap: () => context.push('/self-help'),
                   ),
                   _actionCard(
                     context: context,
@@ -219,7 +214,7 @@ class HomeScreen extends StatelessWidget {
                     iconColor: AppColors.primary,
                     title: 'AI Companion',
                     subtitle: 'Talk. Reflect. Feel better.',
-                    onTap: () => context.go('/companion'),
+                    onTap: () => context.push('/companion'),
                   ),
                   _actionCard(
                     context: context,
@@ -228,7 +223,7 @@ class HomeScreen extends StatelessWidget {
                     iconColor: AppColors.onSurfaceVariant,
                     title: 'Check-ins',
                     subtitle: 'Mood & assessments',
-                    onTap: () => context.go('/wellbeing'),
+                    onTap: () => context.push('/wellbeing'),
                   ),
                   _actionCard(
                     context: context,
@@ -237,7 +232,7 @@ class HomeScreen extends StatelessWidget {
                     iconColor: AppColors.secondary,
                     title: 'Book Session',
                     subtitle: 'Talk to a professional',
-                    onTap: () => context.go('/book'),
+                    onTap: () => context.push('/book'),
                   ),
                 ],
               ),
@@ -252,7 +247,7 @@ class HomeScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   GestureDetector(
-                    onTap: () => context.go('/profile'),
+                    onTap: () => context.push('/profile'),
                     child: const Row(
                       children: [
                         Text('View details', style: TextStyle(fontSize: 12, color: AppColors.secondary, fontWeight: FontWeight.w600)),
@@ -346,6 +341,7 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

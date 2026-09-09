@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../services/db_service.dart';
-import '../widgets/quick_screen_switcher.dart';
 
 class HrMobileIngestionReviewScreen extends StatelessWidget {
   const HrMobileIngestionReviewScreen({super.key});
@@ -24,11 +23,10 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      floatingActionButton: const QuickScreenSwitcher(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/hr-overview'),
+          onPressed: () => context.backOr('/hr-overview'),
         ),
         title: const Text('Batch Review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
@@ -188,7 +186,7 @@ class HrMobileIngestionReviewScreen extends StatelessWidget {
                         backgroundColor: AppColors.secondary,
                       ),
                     );
-                    context.go('/hr-overview');
+                    context.backOr('/hr-overview');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryContainer,
