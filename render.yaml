@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: manofit-tara
+    runtime: node
+    rootDir: tara_service
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_LIVE_MODEL
+        value: gemini-3.1-flash-live-preview
+      - key: GEMINI_LIVE_VOICE
+        value: Kore
+      - key: GEMINI_LIVE_LANGUAGE
+        value: en-IN
+
+  - type: web
+    name: manofit-ml
+    runtime: python
+    rootDir: ml_service
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

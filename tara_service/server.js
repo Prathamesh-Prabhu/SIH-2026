@@ -13,7 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '.env') });
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
-const PORT = process.env.TARA_PORT || process.env.PORT || 3000;
+const PORT = process.env.PORT || process.env.TARA_PORT || 3000;
+
 const MODEL = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
 const VOICE = process.env.GEMINI_LIVE_VOICE || 'Kore';
 const LANGUAGE = process.env.GEMINI_LIVE_LANGUAGE || 'en-IN';
@@ -275,6 +276,7 @@ wss.on('connection', async (clientWs) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Tara voice service running at http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Tara voice service running on port ${PORT}`);
 });
+
