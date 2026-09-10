@@ -116,7 +116,8 @@ HR Admin deep-linking to `/hr-analytics` is bounced, not shown a forbidden board
   **Gemini Live** (native audio-to-audio).
   - **Multilingual**: Auto / English / हिंदी toggle. "Auto" mirrors the user and
     switches freely between Hindi, English and Hinglish.
-  - Soft "Leda" voice; English uses a natural Indian-English accent.
+  - **Female / Male voice toggle** (default female "Leda", male "Achird"),
+    natural Indian-English accent, natural conversational pace.
   - Separate **text chat** (a small icon) that works without starting a call.
   - **Crisis auto-escalation**: the relay scans the live speech transcript
     against a high-recall lexicon (English + Hindi); a hit raises a

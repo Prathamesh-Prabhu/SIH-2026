@@ -2,6 +2,7 @@ const callBtn = document.getElementById('callBtn');
 const callWrap = document.getElementById('callWrap');
 const statusEl = document.getElementById('status');
 const langToggle = document.getElementById('langToggle');
+const voiceToggle = document.getElementById('voiceToggle');
 
 let ws = null;
 let captureCtx = null;
@@ -33,11 +34,17 @@ try {
   if (saved === 'auto' || saved === 'en' || saved === 'hi') lang = saved;
 } catch (e) {}
 
+// Voice: 'female' (default) or 'male'. Set at connect time; a switch reconnects.
+let voice = 'female';
+try {
+  const saved = localStorage.getItem('tara_voice');
+  if (saved === 'female' || saved === 'male') voice = saved;
+} catch (e) {}
+
 const BARGE_IN_RMS_THRESHOLD = 0.02;
 
-// Gemini Live has no speaking-rate config, so we slow playback mechanically.
-// Below 1.0 also lowers pitch slightly (not true time-stretching) — tune to taste.
-const PLAYBACK_RATE = 0.88;
+// Playback speed. 1.0 = Gemini's natural pace. Lower also drops pitch slightly.
+const PLAYBACK_RATE = 1.0;
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -199,7 +206,9 @@ async function startCall() {
   nextPlayTime = 0;
 
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${protocol}://${location.host}/ws?lang=${encodeURIComponent(lang)}`);
+  ws = new WebSocket(
+    `${protocol}://${location.host}/ws?lang=${encodeURIComponent(lang)}` +
+    `&voice=${encodeURIComponent(voice)}`);
 
   ws.onmessage = async (event) => {
     if (myGen !== generation) return; // stale socket from an ended call
@@ -304,6 +313,36 @@ if (langToggle) {
     if (btn) setLang(btn.dataset.lang);
   });
   paintLangToggle();
+}
+
+// ── Voice toggle (female / male) ──────────────────────────────────────────
+function paintVoiceToggle() {
+  if (!voiceToggle) return;
+  voiceToggle.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.voice === voice);
+  });
+}
+
+function setVoice(next) {
+  if (next === voice || (next !== 'female' && next !== 'male')) return;
+  voice = next;
+  try { localStorage.setItem('tara_voice', voice); } catch (e) {}
+  paintVoiceToggle();
+  if (isActive) {
+    // Gemini's voice is fixed per session — reconnect to switch it.
+    endCall();
+    setTimeout(startCall, 150);
+  } else {
+    setStatus(statusFor('tap'));
+  }
+}
+
+if (voiceToggle) {
+  voiceToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-voice]');
+    if (btn) setVoice(btn.dataset.voice);
+  });
+  paintVoiceToggle();
 }
 
 // ── Auto-end when the WebView is hidden / app backgrounded ─────────────────

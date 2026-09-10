@@ -10,10 +10,12 @@ services:
         sync: false
       - key: GEMINI_LIVE_MODEL
         value: gemini-3.1-flash-live-preview
-      - key: GEMINI_LIVE_VOICE
-        value: Kore
+      - key: GEMINI_LIVE_VOICE_FEMALE
+        value: Leda
+      - key: GEMINI_LIVE_VOICE_MALE
+        value: Achird
       - key: GEMINI_LIVE_LANGUAGE
-        value: en-IN
+        value: auto
 
   - type: web
     name: manofit-ml

@@ -17,12 +17,28 @@ const PORT = process.env.PORT || process.env.TARA_PORT || 3000;
 
 const MODEL = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
 
-// Prebuilt Gemini Live voice. Default `Leda` (youthful, gentle) — a soft,
-// soothing companion voice. Other calm options: `Sulafat` (warm),
-// `Vindemiatrix` (gentle), `Achernar` (soft), `Aoede` (breezy),
-// `Callirrhoe` (easy-going). Full list: https://ai.google.dev/gemini-api/docs/live-guide
-const VOICE = process.env.GEMINI_LIVE_VOICE || 'Leda';
+// Prebuilt Gemini Live voices. The client picks female / male at connect time
+// (a toggle in the Tara UI); `GEMINI_LIVE_VOICE`, if set, pins one for both.
+// Female calm options: Leda (gentle), Sulafat (warm), Aoede (breezy),
+// Vindemiatrix (gentle), Achernar (soft). Male calm options: Achird (friendly),
+// Algieba (smooth), Iapetus (clear), Charon (informative).
+// Full list: https://ai.google.dev/gemini-api/docs/live-guide
+const VOICE_FEMALE = process.env.GEMINI_LIVE_VOICE_FEMALE || 'Leda';
+const VOICE_MALE = process.env.GEMINI_LIVE_VOICE_MALE || 'Achird';
+const VOICE_PINNED = process.env.GEMINI_LIVE_VOICE || '';
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash';
+
+function voiceFor(gender) {
+  if (VOICE_PINNED) return VOICE_PINNED;
+  return gender === 'male' ? VOICE_MALE : VOICE_FEMALE;
+}
+
+function normaliseGender(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (s === 'm' || s === 'male' || s === 'man') return 'male';
+  if (s === 'f' || s === 'female' || s === 'woman') return 'female';
+  return null;
+}
 
 // Language mode: 'auto' (mirror the user, Hindi ⇄ English), 'en' or 'hi'.
 // Back-compat: a BCP-47 value like `en-IN` / `hi-IN` is accepted too.
@@ -100,13 +116,14 @@ armed-forces and CAPF personnel. You give the person a safe, judgment-free space
 their day, their duty, their stress, or whatever's on their mind — no appointments, no scripts, no
 waiting, and nothing they say here reaches their chain of command.
 
-Speak like a caring, emotionally present friend: warm, unhurried, conversational, in short natural
-sentences — never clinical or scripted. Ask gentle open questions like "how are you feeling?" or "what's
-been weighing on you today?", and actually listen — reflect back what you hear before offering anything.
+Speak like a caring, emotionally present friend: warm, conversational, in short natural sentences —
+never clinical or scripted. Ask gentle open questions like "how are you feeling?" or "what's been
+weighing on you today?", and actually listen — reflect back what you hear before offering anything.
 
-Talk the way a real person does, not a polished narrator: use contractions, occasional small natural
-fillers ("hmm", "yeah", "I hear you"), and let sentences trail off or stay incomplete sometimes. Avoid
-over-enunciating or sounding rehearsed. Don't summarise or wrap things up neatly — real conversations are messy.
+Talk the way a real person does, not a polished narrator: use contractions, and keep it warm and
+genuine. Do NOT pad your speech with filler sounds — no "umm", "uh", "aah", "hmm" or drawn-out pauses —
+and don't trail off in the middle of a sentence. Finish your thoughts clearly. Natural and human, but
+easy to follow.
 
 You understand military life — long deployments, rotations, separation from family, the weight of
 responsibility — but you don't pretend to have served. You are not a licensed therapist, doctor, or crisis
@@ -119,9 +136,9 @@ Your job is to help people slow down, process their thoughts, manage everyday st
 vent — not to diagnose or treat.`;
 
 // Spoken-delivery guidance, voice only.
-const TARA_SPOKEN_DELIVERY = `Delivery: speak slowly and unhurried, with real pauses between sentences,
-like someone who isn't in a rush to fill silence. Never rush your words together. Keep each response
-short, like a real spoken conversation, not a monologue. Let the user lead the pace.`;
+const TARA_SPOKEN_DELIVERY = `Delivery: speak at a natural, relaxed conversational pace — calm but not
+slow, with normal sentence rhythm. Keep each response short, like a real spoken conversation, not a
+monologue. Let the user lead the pace.`;
 
 // Per-conversation language rule, prepended to the persona.
 const LANG_RULES = {
@@ -157,9 +174,12 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     service: 'tara',
     model: MODEL,
-    voice: VOICE,
+    voiceFemale: voiceFor('female'),
+    voiceMale: voiceFor('male'),
+    voicePinned: VOICE_PINNED || null,
     textModel: TEXT_MODEL,
     langModes: ['auto', 'en', 'hi'],
+    voiceModes: ['female', 'male'],
     defaultLang: DEFAULT_LANG,
   });
 });
@@ -211,18 +231,21 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 wss.on('connection', async (clientWs, req) => {
   let lang = DEFAULT_LANG;
+  let gender = 'female';
   try {
-    const q = new URL(req.url, 'http://localhost').searchParams.get('lang');
-    lang = normaliseLang(q) || DEFAULT_LANG;
+    const params = new URL(req.url, 'http://localhost').searchParams;
+    lang = normaliseLang(params.get('lang')) || DEFAULT_LANG;
+    gender = normaliseGender(params.get('voice')) || 'female';
   } catch {
-    /* keep default */
+    /* keep defaults */
   }
-  console.log(`Client connected (lang: ${lang})`);
+  const voiceName = voiceFor(gender);
+  console.log(`Client connected (lang: ${lang}, voice: ${gender}/${voiceName})`);
 
   // Native-audio Live models auto-detect language; half-cascade models honour
   // an explicit code. Send one only when the user pinned a language.
   const speechConfig = {
-    voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } },
+    voiceConfig: { prebuiltVoiceConfig: { voiceName } },
   };
   if (lang === 'hi') speechConfig.languageCode = 'hi-IN';
   else if (lang === 'en') speechConfig.languageCode = 'en-IN';

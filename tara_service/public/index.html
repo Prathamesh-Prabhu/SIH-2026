@@ -41,6 +41,12 @@
     max-width: 320px;
     padding: 0 16px;
   }
+  .toggle-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
   .lang-toggle {
     display: flex;
     gap: 4px;
@@ -116,10 +122,16 @@
 <body>
   <h1>TARA</h1>
   <p class="tagline">your calm voice companion</p>
-  <div class="lang-toggle" id="langToggle" role="group" aria-label="Conversation language">
-    <button type="button" data-lang="auto">Auto</button>
-    <button type="button" data-lang="en">EN</button>
-    <button type="button" data-lang="hi" lang="hi">हिं</button>
+  <div class="toggle-row">
+    <div class="lang-toggle" id="langToggle" role="group" aria-label="Conversation language">
+      <button type="button" data-lang="auto">Auto</button>
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="hi" lang="hi">हिं</button>
+    </div>
+    <div class="lang-toggle" id="voiceToggle" role="group" aria-label="Voice">
+      <button type="button" data-voice="female">Female</button>
+      <button type="button" data-voice="male">Male</button>
+    </div>
   </div>
   <div class="call-wrap" id="callWrap">
     <div class="ring"></div>
