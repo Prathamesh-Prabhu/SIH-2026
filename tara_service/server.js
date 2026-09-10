@@ -125,15 +125,14 @@ short, like a real spoken conversation, not a monologue. Let the user lead the p
 
 // Per-conversation language rule, prepended to the persona.
 const LANG_RULES = {
-  en: `Always speak and respond in English with a warm, natural Australian accent — relaxed, everyday
-Australian English the way someone from Australia actually speaks (gentle and genuine, never a caricature).
-Even if the user speaks another language, reply kindly in English.`,
+  en: `Always speak and respond in English, in a warm, gentle, natural Indian-English accent. Even if the
+user speaks another language, reply kindly in English.`,
   hi: `Always speak and respond in natural, everyday conversational Hindi — the way people actually talk,
 not formal or literary Hindi. A few common English words that people naturally mix in ("duty", "stress",
 "family", "leave", "posting") are fine. Even if the user writes in English, reply gently in Hindi.`,
   auto: `Mirror the user's language. If they use Hindi, reply in warm everyday Hindi; if English, reply in
-English with a warm, natural Australian accent; if they mix Hindi and English (Hinglish), mix naturally
-too. Stay within just these two languages — Hindi and English — and switch whenever they do.`,
+gentle Indian-English; if they mix Hindi and English (Hinglish), mix naturally too. Stay within just these
+two languages — Hindi and English — and switch whenever they do.`,
 };
 
 function langRule(lang) {
@@ -226,7 +225,7 @@ wss.on('connection', async (clientWs, req) => {
     voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } },
   };
   if (lang === 'hi') speechConfig.languageCode = 'hi-IN';
-  else if (lang === 'en') speechConfig.languageCode = 'en-AU'; // Australian English
+  else if (lang === 'en') speechConfig.languageCode = 'en-IN';
 
   let geminiSession = null;
   let clientClosed = false;

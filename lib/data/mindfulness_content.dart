@@ -132,14 +132,49 @@ const List<BreathingPattern> kBreathingPatterns = [
 ];
 
 // ── Meditation library ────────────────────────────────────────────────────
-enum MeditationTab { meditate, sleepStories, music }
+enum MeditationTab { meditate, sleep, music }
 
 extension MeditationTabLabel on MeditationTab {
   String get label => switch (this) {
         MeditationTab.meditate => 'Meditate',
-        MeditationTab.sleepStories => 'Sleep stories',
+        MeditationTab.sleep => 'Sleep',
         MeditationTab.music => 'Music',
       };
+}
+
+/// Soothing ambience loops, hosted on Google's free Sound Library
+/// (https://developers.google.com/assistant/tools/sound-library). Streamed and
+/// looped for the length of a session. Drop-in replacements can be bundled
+/// under `assets/audio/` and referenced with [MeditationSession.assetPath].
+class _Snd {
+  static const rainRoof =
+      'https://actions.google.com/sounds/v1/weather/rain_on_roof.ogg';
+  static const rainLight =
+      'https://actions.google.com/sounds/v1/weather/light_rain.ogg';
+  static const waves =
+      'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg';
+  static const oceanLap =
+      'https://actions.google.com/sounds/v1/water/water_lapping_wind.ogg';
+  static const stream =
+      'https://actions.google.com/sounds/v1/water/small_stream_flowing.ogg';
+  static const river =
+      'https://actions.google.com/sounds/v1/water/water_running_by.ogg';
+  static const fountain =
+      'https://actions.google.com/sounds/v1/water/fountain_water_bubbling.ogg';
+  static const forestDay =
+      'https://actions.google.com/sounds/v1/ambiences/summer_forest.ogg';
+  static const forestSpring =
+      'https://actions.google.com/sounds/v1/ambiences/spring_day_forest.ogg';
+  static const birdsMorning =
+      'https://actions.google.com/sounds/v1/ambiences/jungle_atmosphere_morning.ogg';
+  static const nightCrickets =
+      'https://actions.google.com/sounds/v1/ambiences/july_night.ogg';
+  static const campfire =
+      'https://actions.google.com/sounds/v1/ambiences/fire.ogg';
+  static const bonfire =
+      'https://actions.google.com/sounds/v1/ambiences/daytime_forrest_bonfire.ogg';
+  static const warmEvening =
+      'https://actions.google.com/sounds/v1/ambiences/warm_evening_outdoors.ogg';
 }
 
 class MeditationSession {
@@ -148,6 +183,10 @@ class MeditationSession {
     required this.subtitle,
     required this.minutes,
     required this.category,
+    required this.icon,
+    required this.accent,
+    this.audioUrl,
+    this.assetPath,
     this.locked = false,
   });
 
@@ -155,6 +194,16 @@ class MeditationSession {
   final String subtitle;
   final int minutes;
   final String category;
+  final IconData icon;
+  final Color accent;
+
+  /// Looping ambience streamed for the session. Null → a silent guided timer.
+  final String? audioUrl;
+
+  /// Optional bundled track under `assets/audio/` (e.g. `audio/daily_calm.mp3`),
+  /// preferred over [audioUrl] when set.
+  final String? assetPath;
+
   final bool locked;
 }
 
@@ -166,74 +215,174 @@ class MeditationGroup {
 }
 
 const List<MeditationGroup> kMeditationGroups = [
-  MeditationGroup('Recommended for you', MeditationTab.meditate, [
+  // ── Meditate ────────────────────────────────────────────────────────────
+  MeditationGroup('Daily reset', MeditationTab.meditate, [
     MeditationSession(
       title: 'Daily Calm',
-      subtitle: 'A fresh 10-minute reset every day',
+      subtitle: 'A 10-minute reset for any time of day',
       minutes: 10,
-      category: 'Recommended',
+      category: 'Meditate',
+      icon: Icons.wb_twilight_rounded,
+      accent: Color(0xFF2E7D5B),
+      audioUrl: _Snd.forestSpring,
     ),
     MeditationSession(
-      title: '7 Days of Calm',
-      subtitle: 'Build the habit, one day at a time',
+      title: 'Morning Clarity',
+      subtitle: 'Start the day settled and clear',
       minutes: 8,
-      category: 'Recommended',
+      category: 'Meditate',
+      icon: Icons.wb_sunny_outlined,
+      accent: Color(0xFFC9922E),
+      audioUrl: _Snd.birdsMorning,
     ),
   ]),
-  MeditationGroup('Sleep', MeditationTab.meditate, [
-    MeditationSession(
-      title: '7 Days of Sleep',
-      subtitle: 'Ease into deep rest between rotations',
-      minutes: 20,
-      category: 'Sleep',
-    ),
-    MeditationSession(
-      title: 'Bedtime Body Scan',
-      subtitle: 'Release tension from head to toe',
-      minutes: 15,
-      category: 'Sleep',
-    ),
-  ]),
-  MeditationGroup('Anxiety', MeditationTab.meditate, [
+  MeditationGroup('Ease anxiety', MeditationTab.meditate, [
     MeditationSession(
       title: 'Breathe into Calm',
       subtitle: 'Settle a racing mind quickly',
       minutes: 6,
       category: 'Anxiety',
+      icon: Icons.air_rounded,
+      accent: Color(0xFF3E7CB1),
+      audioUrl: _Snd.rainLight,
     ),
     MeditationSession(
       title: 'Grounding in the Present',
       subtitle: 'Come back to here and now',
       minutes: 9,
       category: 'Anxiety',
-    ),
-  ]),
-  MeditationGroup('Sleep stories', MeditationTab.sleepStories, [
-    MeditationSession(
-      title: 'The Night Train',
-      subtitle: 'A slow journey through quiet country',
-      minutes: 25,
-      category: 'Sleep story',
+      icon: Icons.spa_outlined,
+      accent: Color(0xFF4C7A4C),
+      audioUrl: _Snd.stream,
     ),
     MeditationSession(
-      title: 'Still Waters',
-      subtitle: 'Drift off beside a calm mountain lake',
-      minutes: 22,
-      category: 'Sleep story',
+      title: 'Let the Wave Pass',
+      subtitle: 'Ride out a surge of stress',
+      minutes: 7,
+      category: 'Anxiety',
+      icon: Icons.waves_outlined,
+      accent: Color(0xFF2D6E8E),
+      audioUrl: _Snd.waves,
     ),
   ]),
-  MeditationGroup('Music', MeditationTab.music, [
+  MeditationGroup('Focus', MeditationTab.meditate, [
     MeditationSession(
       title: 'Deep Focus',
-      subtitle: 'Ambient textures for concentration',
-      minutes: 30,
-      category: 'Music',
+      subtitle: 'Hold attention on a single point',
+      minutes: 12,
+      category: 'Focus',
+      icon: Icons.center_focus_strong_rounded,
+      accent: Color(0xFF5B5BA6),
+      audioUrl: _Snd.rainRoof,
     ),
+    MeditationSession(
+      title: 'Steady Attention',
+      subtitle: 'A quiet anchor for busy days',
+      minutes: 10,
+      category: 'Focus',
+      icon: Icons.filter_center_focus_rounded,
+      accent: Color(0xFF6A4C93),
+      audioUrl: _Snd.fountain,
+    ),
+  ]),
+
+  // ── Sleep ───────────────────────────────────────────────────────────────
+  MeditationGroup('Wind down', MeditationTab.sleep, [
+    MeditationSession(
+      title: 'Bedtime Body Scan',
+      subtitle: 'Release tension from head to toe',
+      minutes: 15,
+      category: 'Sleep',
+      icon: Icons.nightlight_round,
+      accent: Color(0xFF3B4E8C),
+      audioUrl: _Snd.warmEvening,
+    ),
+    MeditationSession(
+      title: 'Long Exhale to Sleep',
+      subtitle: 'Slow the breath, slow the mind',
+      minutes: 12,
+      category: 'Sleep',
+      icon: Icons.bedtime_outlined,
+      accent: Color(0xFF4A4E9C),
+      audioUrl: _Snd.rainLight,
+    ),
+  ]),
+  MeditationGroup('Sleep soundscapes', MeditationTab.sleep, [
+    MeditationSession(
+      title: 'Rain at Night',
+      subtitle: 'Steady rain on the roof',
+      minutes: 45,
+      category: 'Sleep',
+      icon: Icons.water_drop_outlined,
+      accent: Color(0xFF3E5C76),
+      audioUrl: _Snd.rainRoof,
+    ),
+    MeditationSession(
+      title: 'Night Crickets',
+      subtitle: 'A still summer night',
+      minutes: 45,
+      category: 'Sleep',
+      icon: Icons.dark_mode_outlined,
+      accent: Color(0xFF39496B),
+      audioUrl: _Snd.nightCrickets,
+    ),
+    MeditationSession(
+      title: 'Campfire',
+      subtitle: 'Crackle and warmth',
+      minutes: 40,
+      category: 'Sleep',
+      icon: Icons.local_fire_department_outlined,
+      accent: Color(0xFF9C5A3C),
+      audioUrl: _Snd.campfire,
+    ),
+    MeditationSession(
+      title: 'Ocean at Dusk',
+      subtitle: 'Slow water against the shore',
+      minutes: 45,
+      category: 'Sleep',
+      icon: Icons.sailing_outlined,
+      accent: Color(0xFF2D6E8E),
+      audioUrl: _Snd.oceanLap,
+    ),
+  ]),
+
+  // ── Music ───────────────────────────────────────────────────────────────
+  MeditationGroup('Ambient', MeditationTab.music, [
     MeditationSession(
       title: 'Rain on Canvas',
       subtitle: 'Soft rainfall for rest',
-      minutes: 45,
+      minutes: 30,
       category: 'Music',
+      icon: Icons.grain_rounded,
+      accent: Color(0xFF3E5C76),
+      audioUrl: _Snd.rainLight,
+    ),
+    MeditationSession(
+      title: 'Forest Air',
+      subtitle: 'Birdsong and moving leaves',
+      minutes: 30,
+      category: 'Music',
+      icon: Icons.park_outlined,
+      accent: Color(0xFF2E7D5B),
+      audioUrl: _Snd.forestDay,
+    ),
+    MeditationSession(
+      title: 'Riverbank',
+      subtitle: 'Water moving over stone',
+      minutes: 30,
+      category: 'Music',
+      icon: Icons.water_rounded,
+      accent: Color(0xFF2D6E8E),
+      audioUrl: _Snd.river,
+    ),
+    MeditationSession(
+      title: 'Embers',
+      subtitle: 'A slow-burning fire',
+      minutes: 30,
+      category: 'Music',
+      icon: Icons.fireplace_outlined,
+      accent: Color(0xFF9C5A3C),
+      audioUrl: _Snd.bonfire,
     ),
   ]),
 ];
