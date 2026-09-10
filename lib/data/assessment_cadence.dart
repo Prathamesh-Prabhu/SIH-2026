@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'wellbeing_checkins.dart';
-
-/// The three recurring assessments personnel can attend. Every completion writes
-/// the same 1–5 domain scores into `assessments` (tagged with its cadence), so
-/// they all feed the anonymous Organisation Wellbeing roll-up on the HR
-/// dashboard the moment they are submitted.
+/// The three recurring assessments personnel can attend. Each cadence has its
+/// own question bank (`assessment_questions.dart`) — a quick today-read for
+/// daily, the full six-domain check-in weekly, and a deeper reflective review
+/// monthly. Every completion is tagged with its cadence and feeds the anonymous
+/// Organisation Wellbeing roll-up on the HR dashboard the moment it is
+/// submitted.
 enum CheckInCadence { daily, weekly, monthly }
 
 extension CheckInCadenceX on CheckInCadence {
@@ -18,10 +18,18 @@ extension CheckInCadenceX on CheckInCadence {
       };
 
   String get blurb => switch (this) {
-        CheckInCadence.daily => 'A quick read on today: 3 questions',
-
+        CheckInCadence.daily => 'A quick read on today',
         CheckInCadence.weekly => 'The full six-domain check-in',
         CheckInCadence.monthly => 'A deeper look back over the month',
+      };
+
+  /// One-line framing shown at the top of the questionnaire.
+  String get horizon => switch (this) {
+        CheckInCadence.daily => 'Answer for how today feels — takes under a minute.',
+        CheckInCadence.weekly =>
+          'Think across the whole week, not just today.',
+        CheckInCadence.monthly =>
+          'A monthly look back — workload, rest, support, and the bigger picture.',
       };
 
   IconData get icon => switch (this) {
@@ -30,26 +38,18 @@ extension CheckInCadenceX on CheckInCadence {
         CheckInCadence.monthly => Icons.calendar_month_outlined,
       };
 
+  /// Accent colour used across the hub card and questionnaire for this cadence.
+  Color get accent => switch (this) {
+        CheckInCadence.daily => const Color(0xFF2E7D5B),
+        CheckInCadence.weekly => const Color(0xFF1F6F8B),
+        CheckInCadence.monthly => const Color(0xFF6A4C93),
+      };
+
   Duration get interval => switch (this) {
         CheckInCadence.daily => const Duration(days: 1),
         CheckInCadence.weekly => const Duration(days: 7),
         CheckInCadence.monthly => const Duration(days: 30),
       };
-
-  /// Domain keys this cadence asks about.
-  List<String> get domainKeys => switch (this) {
-        CheckInCadence.daily => const [
-            'workload_perception',
-            'physical_exhaustion',
-            'mood_rating',
-          ],
-        CheckInCadence.weekly => [for (final i in kWellbeingCheckIns) i.key],
-        CheckInCadence.monthly => [for (final i in kWellbeingCheckIns) i.key],
-      };
-
-  /// The check-in items to present, in the canonical order.
-  List<CheckInItem> get items =>
-      [for (final i in kWellbeingCheckIns) if (domainKeys.contains(i.key)) i];
 }
 
 CheckInCadence cadenceFromId(String? id) => switch (id) {

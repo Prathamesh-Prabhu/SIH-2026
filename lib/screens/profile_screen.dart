@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/constants/app_constants.dart';
 import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../data/badges.dart';
@@ -23,22 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => context.read<DbService>().refreshMindfulness(),
     );
-  }
-
-  /// Effective streak = the profile streak, or the number of distinct days the
-  /// user has actually logged something, whichever is higher — so activity in
-  /// the demo can push the rank up.
-  int _effectiveStreak(DbService db, int profileStreak) {
-    final days = <String>{};
-    for (final m in db.mindfulnessMoods) {
-      final d = (m['created_at'] as String?)?.split('T').first;
-      if (d != null) days.add(d);
-    }
-    for (final l in db.mindfulnessLogs) {
-      final d = (l['created_at'] as String?)?.split('T').first;
-      if (d != null) days.add(d);
-    }
-    return days.length > profileStreak ? days.length : profileStreak;
   }
 
   BadgeStats _stats(DbService db, int streak) {
@@ -64,7 +49,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final supabase = SupabaseService();
     final user = auth.currentUser;
 
-    final streak = _effectiveStreak(db, user?.streakCount ?? 0);
+    // Rank + milestone badges are a personnel motivation feature — admin,
+    // welfare, commander and oversight roles don't have a wellbeing streak.
+    final isPersonnel = user == null || user.role == UserRole.personnel;
+
+    final streak = db.currentStreak(profileStreak: user?.streakCount ?? 0);
     final rank = rankForStreak(streak);
     final next = nextRank(streak);
     final stats = _stats(db, streak);
@@ -77,8 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.backOr('/home'),
         ),
-        title: const Text('Personnel Profile',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(isPersonnel ? 'Personnel Profile' : 'Profile',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -86,46 +75,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _RankHero(rank: rank, next: next, streak: streak),
-              const SizedBox(height: 16),
+              if (isPersonnel) ...[
+                _RankHero(rank: rank, next: next, streak: streak),
+                const SizedBox(height: 16),
+              ],
 
-              _identityCard(user, rank, streak),
+              _identityCard(user, isPersonnel ? rank : null, streak,
+                  showStats: isPersonnel),
               const SizedBox(height: 20),
 
-              // ── Badge collection ──────────────────────────────────────
-              Row(
-                children: [
-                  const Text('Achievements',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onSurfaceVariant)),
-                  const Spacer(),
-                  Text('$earned / ${kMilestoneBadges.length} earned',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.secondary)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              GridView.count(
-                crossAxisCount: 4,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.72,
-                children: [
-                  for (final b in kMilestoneBadges)
-                    _BadgeTile(
-                      badge: b,
-                      value: b.value(stats),
-                      onTap: () => _showBadgeDetail(b, b.value(stats)),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 20),
+              // ── Badge collection (personnel only) ─────────────────────
+              if (isPersonnel) ...[
+                Row(
+                  children: [
+                    const Text('Achievements',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.onSurfaceVariant)),
+                    const Spacer(),
+                    Text('$earned / ${kMilestoneBadges.length} earned',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.secondary)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                GridView.count(
+                  crossAxisCount: 4,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.72,
+                  children: [
+                    for (final b in kMilestoneBadges)
+                      _BadgeTile(
+                        badge: b,
+                        value: b.value(stats),
+                        onTap: () => _showBadgeDetail(b, b.value(stats)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Trust banner
               Container(
@@ -244,7 +238,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _identityCard(dynamic user, StreakRank rank, int streak) {
+  Widget _identityCard(dynamic user, StreakRank? rank, int streak,
+      {bool showStats = true}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -278,20 +273,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: AppColors.onSecondaryContainer),
                     ),
                   ),
-                  Positioned(
-                    right: -4,
-                    bottom: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: rank.color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: AppColors.surfaceContainerLowest, width: 2),
+                  if (rank != null)
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: rank.color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppColors.surfaceContainerLowest, width: 2),
+                        ),
+                        child: Icon(rank.icon, size: 12, color: Colors.white),
                       ),
-                      child: Icon(rank.icon, size: 12, color: Colors.white),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(width: 16),
@@ -333,18 +329,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _metricTile('$streak', 'Day Streak', rank.color),
-              _metricTile('${user?.readinessScore ?? 88}%', 'Readiness',
-                  AppColors.secondary),
-              _metricTile(user?.stressZone ?? 'Zone A', 'Stress Level',
-                  AppColors.primary),
-            ],
-          ),
+          if (showStats) ...[
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _metricTile('$streak', 'Day Streak',
+                    rank?.color ?? AppColors.secondary),
+                _metricTile('${user?.readinessScore ?? 88}%', 'Readiness',
+                    AppColors.secondary),
+                _metricTile(user?.stressZone ?? 'Zone A', 'Stress Level',
+                    AppColors.primary),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -1,7 +1,7 @@
 name: manofit
 description: "ManoFit - AI-Powered Personnel Stress & Welfare Monitoring System for Armed Forces and CAPFs"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.2.2+8
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

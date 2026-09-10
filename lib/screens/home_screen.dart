@@ -294,7 +294,7 @@ class HomeScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${user?.streakCount ?? 3}',
+                                '${db.currentStreak(profileStreak: user?.streakCount ?? 0)}',
                                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
                               ),
                               const Text('Day Streak', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),

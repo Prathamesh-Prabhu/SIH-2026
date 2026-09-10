@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/assessment_questions.dart';
 import '../data/wellbeing_checkins.dart';
 import 'auth_service.dart';
 import 'ml_service.dart';
@@ -184,6 +185,93 @@ class DbService extends ChangeNotifier {
 
   int get anonymousCheckInCount => anonymousCheckIns.length;
 
+  /// Anonymous responses to the monthly-only reflective domains (purpose, home
+  /// strain, financial pressure, future in service) — for the HR "Monthly
+  /// deep-dive" panel. Read from the flat local cache; each entry is just the
+  /// 1–5 scores present, no identity.
+  List<Map<String, int>> get anonymousDeepDiveResponses {
+    final keys = [for (final d in kDeepDiveDomains) d.key];
+    final out = <Map<String, int>>[];
+    for (final a in _assessments) {
+      final m = <String, int>{};
+      for (final k in keys) {
+        final v = a[k];
+        if (v is int) m[k] = v;
+        if (v is num) m[k] = v.round();
+      }
+      if (m.isNotEmpty) out.add(m);
+    }
+    return out;
+  }
+
+  /// Count of completed check-ins per cadence, for the HR participation view.
+  Map<String, int> get checkInCountsByCadence {
+    final counts = <String, int>{'daily': 0, 'weekly': 0, 'monthly': 0};
+    for (final a in _assessments) {
+      final tag = (a['cadence'] as String?) ?? 'weekly';
+      counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// The person's current wellbeing streak: the run of consecutive days ending
+  /// today (or yesterday, if nothing is logged yet today) on which they logged
+  /// any mood, mindfulness activity, or check-in. [profileStreak] is used as a
+  /// floor so a server-tracked history the local cache hasn't loaded still
+  /// counts. This is the single source of truth for the Home and Profile
+  /// screens.
+  int currentStreak({int profileStreak = 0}) {
+    final days = <DateTime>{};
+    void add(Object? iso) {
+      if (iso is! String) return;
+      final d = DateTime.tryParse(iso);
+      if (d != null) days.add(DateTime(d.year, d.month, d.day));
+    }
+
+    for (final m in _mindfulnessMoods) {
+      add(m['created_at']);
+    }
+    for (final l in _mindfulnessLogs) {
+      add(l['created_at']);
+    }
+    for (final m in _moodLogs) {
+      add(m['created_at']);
+    }
+    for (final a in _assessments) {
+      add(a['created_at']);
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    var cursor = days.contains(today)
+        ? today
+        : today.subtract(const Duration(days: 1));
+    var streak = 0;
+    while (days.contains(cursor)) {
+      streak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    return streak > profileStreak ? streak : profileStreak;
+  }
+
+  /// Check-ins completed on each of the last [days] days (index 0 = oldest,
+  /// last = today), for the HR participation trend line.
+  List<int> checkInsPerDay({int days = 14}) {
+    final series = List<int>.filled(days, 0);
+    final startOfToday = DateTime(
+        DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    for (final a in _assessments) {
+      final ts = a['created_at'];
+      final when = ts is String ? DateTime.tryParse(ts) : null;
+      if (when == null) continue;
+      final day = DateTime(when.year, when.month, when.day);
+      final offset = startOfToday.difference(day).inDays; // 0 = today
+      if (offset < 0 || offset >= days) continue;
+      series[days - 1 - offset]++;
+    }
+    return series;
+  }
+
   /// When the most recent [cadence] check-in was completed (rows written before
   /// cadence tagging count as weekly).
   DateTime? lastCheckInAt(String cadence) {
@@ -313,10 +401,12 @@ class DbService extends ChangeNotifier {
     return true;
   }
 
-  // --- 2. ASSESSMENTS — the 6 private check-ins (PRD §7) ---
-  /// Persists one wellbeing check-in. [answers] is keyed by the six
-  /// `CheckInItem.key` values, each 1–5, stored both as named columns (what
-  /// the ML layer reads) and in `answers` for provenance.
+  // --- 2. ASSESSMENTS — the private check-ins (PRD §7) ---
+  /// Persists one wellbeing check-in. [answers] is keyed by `AssessmentQuestion`
+  /// keys (each 1–5) for whichever [cadence] bank was answered. The six core
+  /// domains are written as named columns (what the ML layer / org roll-up
+  /// read); every answered domain — core plus the monthly-only reflective ones
+  /// — goes into the `answers` blob for provenance and the HR deep-dive.
   ///
   /// Returns true when the row reached Supabase (or when running in
   /// mock/demo mode, where the local cache is the source of truth).
@@ -327,39 +417,46 @@ class DbService extends ChangeNotifier {
     final now = DateTime.now();
     final total = orientedWellbeingTotal(answers);
 
-    // Columns the analytics layer consumes. Absent answers stay null rather
-    // than being silently defaulted to a neutral 3 — a skipped item is not
-    // the same signal as "average".
+    // Columns the analytics layer consumes — the six core domains only. Absent
+    // answers stay null rather than being defaulted to a neutral 3.
+    final coreKeys = {for (final i in kWellbeingCheckIns) i.key};
     final scores = <String, dynamic>{
-      for (final item in kWellbeingCheckIns)
-        if (answers[item.key] != null) item.key: answers[item.key],
+      for (final e in answers.entries)
+        if (coreKeys.contains(e.key)) e.key: e.value,
     };
 
     final payload = <String, dynamic>{
       'user_id': _auth.currentUser?.id,
       'service_id': _auth.currentUser?.serviceId ?? 'CAPF-8821',
-      'assessment_type': 'SIX_CHECKIN_V1',
+      'assessment_type': 'CHECKIN_${cadence.toUpperCase()}_V1',
       'cadence': cadence,
       'total_score': total,
       'question_count': answers.length,
       'answers': {
-        for (final item in kWellbeingCheckIns)
-          if (answers[item.key] != null)
-            item.key: {
-              'question': item.question,
-              'value': answers[item.key],
-              'label': item.labels[answers[item.key]! - 1],
-              'higher_is_better': item.higherIsBetter,
-            },
+        for (final e in answers.entries)
+          e.key: {
+            'question': kAssessmentQuestionByKey[e.key]?.question,
+            'value': e.value,
+            'label': (kAssessmentQuestionByKey[e.key]?.labels.length ?? 0) >=
+                    e.value
+                ? kAssessmentQuestionByKey[e.key]!.labels[e.value - 1]
+                : null,
+            'higher_is_better':
+                kAssessmentQuestionByKey[e.key]?.higherIsBetter ?? true,
+            'core': kAssessmentQuestionByKey[e.key]?.core ?? true,
+          },
       },
       'status': 'completed',
       ...scores,
     };
 
-    // Local cache keeps its own id/timestamp for the UI; the remote row lets
-    // Postgres generate the uuid PK and created_at.
+    // Local cache keeps its own id/timestamp for the UI, and every answered
+    // domain flat (core + monthly-only) so the HR roll-up and deep-dive can
+    // read them without unpacking the blob. The remote row only carries the
+    // core columns (schema) plus the full `answers` blob.
     _assessments.insert(0, {
       ...payload,
+      ...answers,
       'id': 'asmt-${now.millisecondsSinceEpoch}',
       'created_at': now.toIso8601String(),
     });

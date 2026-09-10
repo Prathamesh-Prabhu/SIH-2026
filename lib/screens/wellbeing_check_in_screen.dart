@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../data/assessment_cadence.dart';
-import '../data/wellbeing_checkins.dart';
+import '../data/assessment_questions.dart';
 import '../services/db_service.dart';
 
-/// The private check-ins (PRD §7). Direct "wellness survey data" input to the
-/// analytics layer — one item per page, 1–5 scale, nothing scored back to the
-/// user. Which items are asked depends on the [cadence].
+/// The private check-ins (PRD §7). One question per page, 1–5 scale, nothing
+/// scored back to the user. The question bank depends on the [cadence].
 class WellbeingCheckInScreen extends StatefulWidget {
   const WellbeingCheckInScreen({super.key, this.cadence = CheckInCadence.weekly});
 
@@ -23,14 +22,16 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
   final Map<String, int> _answers = {};
   bool _submitting = false;
 
-  List<CheckInItem> get _items => widget.cadence.items;
-  CheckInItem get _item => _items[_index];
+  List<AssessmentQuestion> get _items => questionsForCadence(widget.cadence);
+  AssessmentQuestion get _item => _items[_index];
   int? get _selected => _answers[_item.key];
   bool get _isLast => _index == _items.length - 1;
+  Color get _accent => widget.cadence.accent;
 
   Future<void> _submit() async {
     setState(() => _submitting = true);
-    final ok = await _db.recordWellbeingCheckIn(_answers, cadence: widget.cadence.id);
+    final ok =
+        await _db.recordWellbeingCheckIn(_answers, cadence: widget.cadence.id);
     if (!mounted) return;
     setState(() => _submitting = false);
 
@@ -38,14 +39,13 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: AppColors.surface,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.verified_user_outlined, color: AppColors.secondary),
-            SizedBox(width: 8),
-            Expanded(
+            Icon(Icons.check_circle_rounded, color: _accent),
+            const SizedBox(width: 8),
+            const Expanded(
               child: Text('Check-in recorded',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             ),
@@ -56,24 +56,22 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${widget.cadence.title} saved: ${_items.length} of ${_items.length} answered.',
-              style: const TextStyle(
+              '${widget.cadence.title} saved — ${_items.length} answers.',
+              style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                   color: AppColors.primary),
             ),
             const SizedBox(height: 10),
             const Text(
-              'Your answers are pseudonymized before they reach the welfare analytics layer. '
-              'Your commander cannot see them, and no individual score or flag is ever shown '
-              'back to you or to the chain of command.',
-              style:
-                  TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+              'Pseudonymised before it reaches welfare analytics. Your commander '
+              'cannot see it, and no score or flag is shown back to you.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.onSurfaceVariant),
             ),
             if (!ok) ...[
               const SizedBox(height: 10),
               const Text(
-                'Saved on this device, it will sync when the connection is restored.',
+                'Saved on this device — it will sync when back online.',
                 style: TextStyle(
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
@@ -85,10 +83,10 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryContainer,
+              backgroundColor: _accent,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () {
               Navigator.pop(ctx);
@@ -103,100 +101,126 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_index + 1) / _items.length;
-
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.backOr('/home'),
+          onPressed: () => context.backOr('/checkins'),
         ),
         title: Text(widget.cadence.title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Cadence framing — one line.
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('CHECK-IN PROGRESS',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                          color: AppColors.onSurfaceVariant)),
-                  Text('${_index + 1} of ${_items.length}',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryContainer)),
+                  Icon(widget.cadence.icon, size: 15, color: _accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(widget.cadence.horizon,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.onSurfaceVariant)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Progress: segmented dots + count.
+              Row(
+                children: [
+                  for (var i = 0; i < _items.length; i++)
+                    Expanded(
+                      child: Container(
+                        margin: EdgeInsets.only(
+                            right: i == _items.length - 1 ? 0 : 4),
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: i <= _index
+                              ? _accent
+                              : AppColors.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: AppColors.surfaceContainerHigh,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.primaryContainer),
-                  minHeight: 6,
-                ),
-              ),
-              const SizedBox(height: 18),
+              Text('Question ${_index + 1} of ${_items.length}',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurfaceVariant)),
+              const SizedBox(height: 16),
 
+              // Question card.
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.secondaryContainer,
-                  borderRadius: BorderRadius.circular(20),
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.hairline),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(_item.icon,
-                        size: 14, color: AppColors.onSecondaryContainer),
-                    const SizedBox(width: 4),
-                    const Flexible(
-                      child: Text('Private: not visible to your unit',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSecondaryContainer)),
+                    Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: _accent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(_item.icon, size: 18, color: _accent),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryContainer,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('Private',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.onSecondaryContainer)),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 14),
+                    Text(_item.question,
+                        style: const TextStyle(
+                            fontSize: 18,
+                            height: 1.3,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary)),
+                    const SizedBox(height: 6),
+                    Text(_item.helper,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            color: AppColors.onSurfaceVariant)),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
 
-              Text(
-                _item.question,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      height: 1.3,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _item.helper,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
-
               for (var i = 0; i < _item.labels.length; i++)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: _optionTile(value: i + 1, label: _item.labels[i]),
                 ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
 
               Row(
                 children: [
@@ -205,15 +229,14 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                       onPressed: () => setState(() => _index--),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side:
-                            const BorderSide(color: AppColors.outlineVariant),
+                        side: const BorderSide(color: AppColors.outlineVariant),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
+                            horizontal: 18, vertical: 14),
                         minimumSize: Size.zero,
                       ),
-                      child: const Text('Previous'),
+                      child: const Text('Back'),
                     ),
                     const SizedBox(width: 12),
                   ],
@@ -229,12 +252,13 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryContainer,
+                        backgroundColor: _accent,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                            AppColors.surfaceContainerHigh,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         minimumSize: Size.zero,
                       ),
                       child: _submitting
@@ -249,7 +273,7 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    _isLast ? 'Submit Check-in' : 'Next',
+                                    _isLast ? 'Submit' : 'Next',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -258,7 +282,10 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Icon(Icons.arrow_forward_rounded,
+                                Icon(
+                                    _isLast
+                                        ? Icons.check_rounded
+                                        : Icons.arrow_forward_rounded,
                                     size: 18),
                               ],
                             ),
@@ -266,14 +293,6 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
                   ),
                 ],
               ),
-              if (_selected == null) ...[
-                const SizedBox(height: 10),
-                const Text(
-                  'Choose the option that fits best to continue.',
-                  style: TextStyle(
-                      fontSize: 12, color: AppColors.onSurfaceVariant),
-                ),
-              ],
             ],
           ),
         ),
@@ -284,44 +303,48 @@ class _WellbeingCheckInScreenState extends State<WellbeingCheckInScreen> {
   Widget _optionTile({required int value, required String label}) {
     final isSelected = _selected == value;
     return Material(
-      color: isSelected
-          ? AppColors.secondaryFixed.withOpacity(0.35)
-          : AppColors.surfaceContainerLowest,
+      color: isSelected ? _accent.withOpacity(0.10) : AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(14),
-      elevation: isSelected ? 0 : 1,
-      shadowColor: Colors.black.withOpacity(0.04),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () => setState(() => _answers[_item.key] = value),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? _accent : AppColors.hairline,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
           child: Row(
             children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? _accent : AppColors.surfaceContainerHigh,
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 15, color: Colors.white)
+                    : Text('$value',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurfaceVariant)),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected
-                        ? AppColors.primaryContainer
-                        : AppColors.onSurface,
+                    fontSize: 14.5,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? _accent : AppColors.onSurface,
                   ),
                 ),
-              ),
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected
-                      ? AppColors.primaryContainer
-                      : AppColors.surfaceContainerHigh,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
               ),
             ],
           ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'assessment_questions.dart';
+
 /// Organisation-wide wellbeing roll-up.
 ///
 /// Takes the anonymous 1–5 wellbeing check-ins the org holds (personnel
@@ -64,6 +66,7 @@ class OrgWellbeingReport {
   const OrgWellbeingReport({
     required this.sampleSize,
     required this.concerns,
+    required this.index,
   });
 
   /// Total anonymous check-ins that fed the roll-up.
@@ -72,7 +75,28 @@ class OrgWellbeingReport {
   /// Domains with enough answers, ranked by adverse rate (worst first).
   final List<WellbeingConcern> concerns;
 
+  /// Overall wellbeing index, 0–100 — the mean of every core answer oriented so
+  /// higher is always better. `null` until there is any data.
+  final int? index;
+
   bool get hasEnough => sampleSize >= kMinOrgSample && concerns.isNotEmpty;
+
+  /// Healthy ≥ 70 · Watch 50–69 · Strained < 50.
+  String get band => index == null
+      ? '—'
+      : index! >= 70
+          ? 'Healthy'
+          : index! >= 50
+              ? 'Watch'
+              : 'Strained';
+
+  Color get bandColor => index == null
+      ? const Color(0xFF6B746E)
+      : index! >= 70
+          ? const Color(0xFF24704F)
+          : index! >= 50
+              ? const Color(0xFFE7A126)
+              : const Color(0xFFE56857);
 }
 
 OrgWellbeingReport computeOrgWellbeing(List<Map<String, int>> checkIns) {
@@ -99,5 +123,61 @@ OrgWellbeingReport computeOrgWellbeing(List<Map<String, int>> checkIns) {
     final r = b.rate.compareTo(a.rate);
     return r != 0 ? r : b.affected.compareTo(a.affected);
   });
-  return OrgWellbeingReport(sampleSize: checkIns.length, concerns: concerns);
+
+  // Overall index: every core answer, oriented so 5 is always "good", averaged
+  // and rescaled 1–5 → 0–100. Matches the ML scale contract in
+  // `wellbeing_checkins.dart` (workload + exhaustion are higher = worse).
+  const coreKeys = {
+    'workload_perception',
+    'physical_exhaustion',
+    'sleep_quality',
+    'mood_rating',
+    'manager_relationship',
+    'peer_social_support',
+  };
+  const higherIsWorse = {'workload_perception', 'physical_exhaustion'};
+  var sum = 0;
+  var n = 0;
+  for (final c in checkIns) {
+    for (final entry in c.entries) {
+      if (!coreKeys.contains(entry.key)) continue;
+      final v = entry.value;
+      sum += higherIsWorse.contains(entry.key) ? (6 - v) : v;
+      n++;
+    }
+  }
+  final index = n == 0 ? null : (((sum / n) - 1) / 4 * 100).round().clamp(0, 100);
+
+  return OrgWellbeingReport(
+    sampleSize: checkIns.length,
+    concerns: concerns,
+    index: index,
+  );
+}
+
+// ── Monthly deep-dive roll-up ─────────────────────────────────────────────
+/// Adverse-rate per monthly-only reflective domain, ranked worst first. Only
+/// domains with at least [kMinDomainSample] answers are returned.
+List<WellbeingConcern> computeDeepDive(List<Map<String, int>> responses) {
+  final out = <WellbeingConcern>[];
+  for (final d in kDeepDiveDomains) {
+    var answered = 0;
+    var affected = 0;
+    for (final r in responses) {
+      final v = r[d.key];
+      if (v == null) continue;
+      answered++;
+      if (d.isAdverse(v)) affected++;
+    }
+    if (answered < kMinDomainSample) continue;
+    out.add(WellbeingConcern(
+      key: d.key,
+      label: d.label,
+      icon: d.icon,
+      affected: affected,
+      answered: answered,
+    ));
+  }
+  out.sort((a, b) => b.rate.compareTo(a.rate));
+  return out;
 }

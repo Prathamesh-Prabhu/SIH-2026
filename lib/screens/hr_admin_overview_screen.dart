@@ -134,6 +134,8 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
                   const SizedBox(height: 16),
                   _orgWellbeingCard(),
                   const SizedBox(height: 16),
+                  _participationCard(),
+                  const SizedBox(height: 16),
                   _actions(),
                   const SizedBox(height: 16),
                   _privacyNotice(),
@@ -428,6 +430,7 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
   // ── Organisation wellbeing ───────────────────────────────────────────────
   Widget _orgWellbeingCard() {
     final report = computeOrgWellbeing(_db.anonymousCheckIns);
+    final deepDive = computeDeepDive(_db.anonymousDeepDiveResponses);
 
     return _panel(
       child: Column(
@@ -441,62 +444,146 @@ class _HrAdminOverviewScreenState extends State<HrAdminOverviewScreen> {
                 child: Text('Organisation wellbeing',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: HrAdminOverviewScreen._ink)),
               ),
-              if (report.hasEnough)
+              if (report.sampleSize > 0)
                 Text('${report.sampleSize} check-ins',
                     style: const TextStyle(fontSize: 10.5, color: HrAdminOverviewScreen._muted)),
             ],
           ),
-          const SizedBox(height: 14),
-          if (!report.hasEnough)
+          const SizedBox(height: 16),
+          if (report.index == null)
             Text(
               'Needs $kMinOrgSample+ anonymous check-ins (${report.sampleSize} so far).',
               style: const TextStyle(fontSize: 12, color: HrAdminOverviewScreen._muted),
             )
-          else
-            ...report.concerns.map(_concernRow),
+          else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _IndexRing(
+                    value: report.index!,
+                    color: report.bandColor,
+                    band: report.band),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    children: [
+                      for (final c in report.concerns.take(3)) _concernBar(c),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            for (final c in report.concerns.skip(3)) _concernBar(c),
+            if (deepDive.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Container(height: 1, color: const Color(0xFFE2EDE6)),
+              const SizedBox(height: 10),
+              const Text('Monthly deep-dive',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: HrAdminOverviewScreen._muted)),
+              const SizedBox(height: 10),
+              for (final c in deepDive.take(4)) _concernBar(c),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  Widget _concernRow(WellbeingConcern c) {
+  Widget _concernBar(WellbeingConcern c) {
     final color = c.rate >= 0.5
         ? HrAdminOverviewScreen._coral
         : (c.rate >= 0.25 ? HrAdminOverviewScreen._amber : HrAdminOverviewScreen._green);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(c.icon, size: 15, color: HrAdminOverviewScreen._muted),
-              const SizedBox(width: 6),
               Expanded(
                 child: Text(c.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 12.5, fontWeight: FontWeight.w600, color: HrAdminOverviewScreen._ink)),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: HrAdminOverviewScreen._ink)),
               ),
               const SizedBox(width: 8),
               Text('${c.pct}%',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
-              const SizedBox(width: 6),
-              Text('${c.affected}/${c.answered}',
-                  style: const TextStyle(fontSize: 10.5, color: HrAdminOverviewScreen._muted)),
+                  style: TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w800, color: color)),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: LinearProgressIndicator(
               value: c.rate.clamp(0.0, 1.0),
-              minHeight: 7,
+              minHeight: 6,
               color: color,
               backgroundColor: const Color(0xFFE8EFEA),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── Check-in participation ───────────────────────────────────────────────
+  Widget _participationCard() {
+    final counts = _db.checkInCountsByCadence;
+    final daily = counts['daily'] ?? 0;
+    final weekly = counts['weekly'] ?? 0;
+    final monthly = counts['monthly'] ?? 0;
+    final series = _db.checkInsPerDay(days: 14);
+    final total = daily + weekly + monthly;
+
+    return _panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.insights_outlined,
+                  size: 18, color: HrAdminOverviewScreen._green),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Check-in participation',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: HrAdminOverviewScreen._ink)),
+              ),
+              Text('$total total',
+                  style: const TextStyle(
+                      fontSize: 10.5, color: HrAdminOverviewScreen._muted)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (total == 0)
+            const Text('No check-ins submitted yet.',
+                style: TextStyle(
+                    fontSize: 12, color: HrAdminOverviewScreen._muted))
+          else ...[
+            _CountBars(rows: [
+              _CountRow('Daily', daily, HrAdminOverviewScreen._green),
+              _CountRow('Weekly', weekly, HrAdminOverviewScreen._amber),
+              _CountRow('Monthly', monthly, const Color(0xFF6A4C93)),
+            ]),
+            const SizedBox(height: 18),
+            const Text('LAST 14 DAYS',
+                style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: HrAdminOverviewScreen._muted)),
+            const SizedBox(height: 8),
+            _LineChart(values: series, color: HrAdminOverviewScreen._green),
+          ],
         ],
       ),
     );
@@ -668,6 +755,202 @@ class _Brand extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Circular gauge for the 0–100 organisation wellbeing index.
+class _IndexRing extends StatelessWidget {
+  const _IndexRing({required this.value, required this.color, required this.band});
+
+  final int value;
+  final Color color;
+  final String band;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      height: 92,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
+            size: const Size.square(92),
+            painter: _RingPainter(value / 100, color),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$value',
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: HrAdminOverviewScreen._ink,
+                      height: 1)),
+              const SizedBox(height: 2),
+              Text(band,
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: color)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.fraction, this.color);
+  final double fraction;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(9, 9, size.width - 18, size.height - 18);
+    final bg = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFFE8EFEA);
+    canvas.drawArc(rect, 0, 2 * math.pi, false, bg);
+    final fg = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * fraction.clamp(0.0, 1.0),
+        false, fg);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) =>
+      old.fraction != fraction || old.color != color;
+}
+
+// ── Participation charts ─────────────────────────────────────────────────
+class _CountRow {
+  const _CountRow(this.label, this.value, this.color);
+  final String label;
+  final int value;
+  final Color color;
+}
+
+/// Horizontal bar chart of check-in counts by cadence.
+class _CountBars extends StatelessWidget {
+  const _CountBars({required this.rows});
+  final List<_CountRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final peak = rows.fold<int>(1, (m, r) => r.value > m ? r.value : m);
+    return Column(
+      children: [
+        for (final r in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 54,
+                  child: Text(r.label,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: HrAdminOverviewScreen._ink)),
+                ),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: LinearProgressIndicator(
+                      value: (r.value / peak).clamp(0.0, 1.0),
+                      minHeight: 12,
+                      color: r.color,
+                      backgroundColor: const Color(0xFFEDF2EE),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 24,
+                  child: Text('${r.value}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: HrAdminOverviewScreen._ink)),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Small filled line chart of a daily count series.
+class _LineChart extends StatelessWidget {
+  const _LineChart({required this.values, required this.color});
+  final List<int> values;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 64,
+      width: double.infinity,
+      child: CustomPaint(
+          painter: _LinePainter(
+              [for (final v in values) v.toDouble()], color)),
+    );
+  }
+}
+
+class _LinePainter extends CustomPainter {
+  _LinePainter(this.values, this.color);
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+    final maxV = values.reduce(math.max).clamp(1.0, double.infinity);
+    final dx = values.length == 1 ? 0.0 : size.width / (values.length - 1);
+    Offset at(int i) =>
+        Offset(dx * i, size.height - (values[i] / maxV) * (size.height - 6) - 3);
+
+    final baseline = size.height;
+    final fill = Path()..moveTo(0, baseline);
+    final line = Path()..moveTo(at(0).dx, at(0).dy);
+    fill.lineTo(at(0).dx, at(0).dy);
+    for (var i = 1; i < values.length; i++) {
+      line.lineTo(at(i).dx, at(i).dy);
+      fill.lineTo(at(i).dx, at(i).dy);
+    }
+    fill
+      ..lineTo(size.width, baseline)
+      ..close();
+
+    canvas.drawPath(
+        fill,
+        Paint()
+          ..style = PaintingStyle.fill
+          ..color = color.withOpacity(0.12));
+    canvas.drawPath(
+        line,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeJoin = StrokeJoin.round
+          ..color = color);
+
+    final dot = Paint()..color = color;
+    canvas.drawCircle(at(values.length - 1), 3, dot);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LinePainter old) =>
+      old.values != values || old.color != color;
 }
 
 class _Donut extends StatelessWidget {

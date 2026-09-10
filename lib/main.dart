@@ -14,22 +14,33 @@ import 'services/supabase_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load `.env` (bundled as an asset). Missing file is non-fatal — the app
-  // then runs on its resilient mock/demo fallback.
+  // Startup must never take the whole app down with it — on a release build a
+  // thrown exception here just yields a black screen. Every step is isolated
+  // and best-effort; the app can always fall back to its mock/demo mode.
+  Future<void> step(String label, Future<void> Function() body) async {
+    try {
+      await body();
+    } catch (e, st) {
+      debugPrint('ManoFit startup: "$label" failed (continuing): $e\n$st');
+    }
+  }
+
+  // Load `.env` (bundled as an asset). Missing file is non-fatal.
   try {
     await dotenv.load(fileName: '.env');
-  } catch (_) {
+  } catch (e) {
+    debugPrint('ManoFit startup: dotenv load failed (continuing): $e');
     dotenv.testLoad(fileInput: '');
   }
 
   final supabaseService = SupabaseService();
-  await supabaseService.init();
+  await step('supabase.init', supabaseService.init);
 
   final authService = AuthService();
-  await authService.init();
+  await step('auth.init', authService.init);
 
   final dbService = DbService();
-  await dbService.init();
+  await step('db.init', dbService.init);
 
   // Probe the Analytics & ML microservice in the background — adopts dynamic
   // Supabase endpoints if published by start-backends.ps1, or falls back to
@@ -38,7 +49,8 @@ void main() async {
   unawaited(mlService.init(remoteEndpoint: supabaseService.remoteMlUrl));
 
   // Apply any dynamic Tara relay URL from Supabase / saved override before the WebView opens.
-  await TaraConfig.load(remoteEndpoint: supabaseService.remoteTaraUrl);
+  await step('tara.load',
+      () => TaraConfig.load(remoteEndpoint: supabaseService.remoteTaraUrl));
 
   runApp(
     MultiProvider(

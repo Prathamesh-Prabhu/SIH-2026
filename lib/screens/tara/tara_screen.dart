@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -13,17 +14,15 @@ import '../../core/navigation.dart';
 import '../../core/tara_config.dart';
 import '../../services/db_service.dart';
 import '../../services/supabase_service.dart';
-import '../../widgets/tara_settings_dialog.dart';
 
-/// Tara — the wellness companion, with two fully independent modes:
+/// Tara — the wellness companion. The screen is the `tara_service` voice UI
+/// (Gemini Live audio-to-audio) in a WebView; a small chat icon in the app bar
+/// opens a text conversation with the same Tara (`POST /chat`, plain Gemini,
+/// same persona). The two don't depend on each other — text chat works whether
+/// or not a voice call is running.
 ///
-///  * **Chat** — a plain Flutter text conversation (`POST /chat`, non-Live
-///    Gemini). No microphone, no WebView. Available the moment the screen opens.
-///  * **Voice** — the `tara_service` WebView (Gemini Live audio-to-audio). Only
-///    loaded, and only granted the mic, once the user opens this tab.
-///
-/// Switching to Chat, backgrounding the app, or leaving the screen all hang up
-/// any live voice call so nothing keeps running unattended.
+/// Leaving the screen or backgrounding the app hangs up any live voice call so
+/// nothing keeps the mic + Gemini session running unattended.
 ///
 /// Both paths scan for crisis language (voice via the `CrisisChannel` JS bridge,
 /// `/chat` via `crisis: true`); either way [_escalate] raises a `crisis_alerts`
@@ -35,41 +34,23 @@ class TaraScreen extends StatefulWidget {
   State<TaraScreen> createState() => _TaraScreenState();
 }
 
-enum _TaraMode { chat, voice }
-
 class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
-  static const _modePrefsKey = 'manofit_tara_mode';
   static const _ink = Color(0xFF02150F);
   static const _mint = Color(0xFF9ED1C3);
   static const _pine = Color(0xFF37675B);
 
   WebViewController? _controller;
-  bool _voiceLoading = true;
-  String? _voiceError;
+  bool _loading = true;
+  String? _error;
   bool _micGranted = false;
   bool _crisisHandled = false;
-
-  _TaraMode _mode = _TaraMode.chat;
-  bool _voiceRequested = false; // first time the Voice tab is opened
-  bool _voiceIniting = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     context.read<DbService>().noteTaraOpened();
-    _restoreMode();
-  }
-
-  Future<void> _restoreMode() async {
-    var restored = _TaraMode.chat;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getString(_modePrefsKey) == 'voice') restored = _TaraMode.voice;
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() => _mode = restored);
-    if (restored == _TaraMode.voice) _activateVoice();
+    _init();
   }
 
   @override
@@ -92,34 +73,9 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  Future<void> _persistMode(_TaraMode m) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_modePrefsKey, m == _TaraMode.voice ? 'voice' : 'chat');
-    } catch (_) {}
-  }
-
-  void _selectMode(_TaraMode m) {
-    if (m == _mode) return;
-    if (m == _TaraMode.chat) _hangUpVoice();
-    setState(() => _mode = m);
-    _persistMode(m);
-    if (m == _TaraMode.voice) _activateVoice();
-  }
-
-  Future<void> _activateVoice() async {
-    if (_voiceIniting || _controller != null) return;
-    _voiceIniting = true;
-    if (mounted) setState(() => _voiceRequested = true);
-    await _initVoice();
-    _voiceIniting = false;
-  }
-
-  Future<void> _initVoice() async {
-    final status = await Permission.microphone.request();
-    if (!mounted) return;
-    _micGranted = status.isGranted;
-
+  /// Resolves the relay endpoint (Supabase → .env → localhost), used by both
+  /// the voice WebView and the text chat.
+  Future<void> _resolveEndpoint() async {
     final sb = context.read<SupabaseService>();
     if (sb.remoteTaraUrl == null || sb.remoteTaraUrl!.isEmpty) {
       await sb.fetchSystemEndpoints();
@@ -127,6 +83,21 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
     if (sb.remoteTaraUrl != null && sb.remoteTaraUrl!.isNotEmpty) {
       TaraConfig.syncFromSupabase(sb.remoteTaraUrl!);
     }
+  }
+
+  Future<void> _init() async {
+    final status = await Permission.microphone.request();
+    if (!mounted) return;
+    _micGranted = status.isGranted;
+
+    await _resolveEndpoint();
+
+    // Nudge the relay awake — a free-tier host sleeps when idle and the first
+    // request otherwise cold-starts (and can time the chat out).
+    unawaited(http
+        .get(Uri.parse('${TaraConfig.url}/health'))
+        .timeout(const Duration(seconds: 60))
+        .catchError((_) => http.Response('', 408)));
 
     final controller = WebViewController.fromPlatformCreationParams(
       const PlatformWebViewControllerCreationParams(),
@@ -140,17 +111,17 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
-            if (mounted) setState(() => _voiceLoading = true);
+            if (mounted) setState(() => _loading = true);
           },
           onPageFinished: (_) {
-            if (mounted) setState(() => _voiceLoading = false);
+            if (mounted) setState(() => _loading = false);
           },
           onWebResourceError: (err) {
             if (err.isForMainFrame == false) return;
             if (mounted) {
               setState(() {
-                _voiceLoading = false;
-                _voiceError = err.description;
+                _loading = false;
+                _error = err.description;
               });
             }
           },
@@ -167,17 +138,13 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
     if (mounted) setState(() => _controller = controller);
   }
 
-  Future<void> _reloadVoice() async {
+  Future<void> _reload() async {
     setState(() {
-      _voiceError = null;
-      _voiceLoading = true;
+      _error = null;
+      _loading = true;
       _crisisHandled = false;
     });
-    final sb = context.read<SupabaseService>();
-    await sb.fetchSystemEndpoints();
-    if (sb.remoteTaraUrl != null && sb.remoteTaraUrl!.isNotEmpty) {
-      TaraConfig.syncFromSupabase(sb.remoteTaraUrl!);
-    }
+    await _resolveEndpoint();
     _controller?.loadRequest(Uri.parse(TaraConfig.url));
   }
 
@@ -214,6 +181,61 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
         const SnackBar(content: Text('Dial Tele-MANAS on 14416.')),
       );
     }
+  }
+
+  void _openChat() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: const Color(0xFF071A14),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.82,
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: _pine, borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 8, 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.chat_bubble_rounded, color: _mint, size: 18),
+                    const SizedBox(width: 8),
+                    const Text('Chat with Tara',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFF15332A)),
+              Expanded(
+                child: _TaraChatBody(
+                  onCrisis: (phrase, lastUserText) =>
+                      _escalate(phrase: phrase, transcript: lastUserText),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showCrisisSheet() {
@@ -313,7 +335,7 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final voiceMode = _mode == _TaraMode.voice;
+    final controller = _controller;
 
     return Scaffold(
       backgroundColor: _ink,
@@ -328,139 +350,47 @@ class _TaraScreenState extends State<TaraScreen> with WidgetsBindingObserver {
             style: TextStyle(
                 fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
         actions: [
-          if (voiceMode) ...[
-            IconButton(
-              tooltip: 'Voice relay connection',
-              icon: const Icon(Icons.settings_ethernet_rounded),
-              onPressed: () async {
-                final reload = await TaraSettingsDialog.show(context);
-                if (reload == true && mounted) _reloadVoice();
-              },
-            ),
-            IconButton(
-              tooltip: 'Reload',
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: (_controller != null || _voiceError != null)
-                  ? _reloadVoice
-                  : null,
-            ),
-          ],
+          IconButton(
+            tooltip: 'Chat with Tara',
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            onPressed: _error == null ? _openChat : null,
+          ),
+          IconButton(
+            tooltip: 'Reload',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: (controller != null || _error != null) ? _reload : null,
+          ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(54),
-          child: _ModeToggle(current: _mode, onChanged: _selectMode),
-        ),
       ),
       body: SafeArea(
-        child: IndexedStack(
-          sizing: StackFit.expand,
-          index: voiceMode ? 1 : 0,
+        child: Stack(
           children: [
-            _TaraChatView(
-              onCrisis: (phrase, lastUserText) =>
-                  _escalate(phrase: phrase, transcript: lastUserText),
-            ),
-            _voicePane(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _voicePane() {
-    if (!_voiceRequested || (_controller == null && _voiceError == null)) {
-      return const Center(child: CircularProgressIndicator(color: _mint));
-    }
-    if (_voiceError != null) {
-      return _ErrorPanel(message: _voiceError!, onRetry: _reloadVoice);
-    }
-    final controller = _controller!;
-    return Stack(
-      children: [
-        WebViewWidget(controller: controller),
-        if (_voiceLoading)
-          const Center(child: CircularProgressIndicator(color: _mint)),
-        if (!_micGranted)
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: _MicHint(
-              text: 'Microphone permission was denied: grant it in Settings and '
-                  'reload for voice. Use Chat in the meantime.',
-            ),
-          )
-        else if (!TaraConfig.isSecureContext)
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: _MicHint(
-              text: 'Tara needs a secure HTTPS connection for microphone access. '
-                  'Chat still works.',
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Voice / Chat mode toggle ───────────────────────────────────────────────
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({required this.current, required this.onChanged});
-
-  final _TaraMode current;
-  final ValueChanged<_TaraMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0C231C),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0x2E9ED1C3)),
-        ),
-        child: Row(
-          children: [
-            _seg('Chat', Icons.chat_bubble_outline_rounded, _TaraMode.chat),
-            _seg('Voice', Icons.graphic_eq_rounded, _TaraMode.voice),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _seg(String label, IconData icon, _TaraMode mode) {
-    final active = current == mode;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onChanged(mode),
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            gradient: active
-                ? const LinearGradient(colors: [Color(0xFF9ED1C3), Color(0xFF37675B)])
-                : null,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 15,
-                  color: active ? const Color(0xFF02241F) : const Color(0xFF7FA093)),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: active
-                        ? const Color(0xFF02241F)
-                        : const Color(0xFF7FA093),
-                  )),
+            if (_error != null)
+              _ErrorPanel(message: _error!, onRetry: _reload)
+            else if (controller == null)
+              const Center(child: CircularProgressIndicator(color: _mint))
+            else ...[
+              WebViewWidget(controller: controller),
+              if (_loading)
+                const Center(child: CircularProgressIndicator(color: _mint)),
             ],
-          ),
+            if (_error == null && !_micGranted)
+              const Align(
+                alignment: Alignment.bottomCenter,
+                child: _MicHint(
+                  text: 'Microphone permission was denied: grant it in Settings '
+                      'and reload for voice. Text chat still works.',
+                ),
+              )
+            else if (_error == null && !TaraConfig.isSecureContext)
+              const Align(
+                alignment: Alignment.bottomCenter,
+                child: _MicHint(
+                  text: 'Tara needs a secure HTTPS connection for microphone '
+                      'access. Text chat still works.',
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -474,17 +404,17 @@ class _ChatMsg {
   final String text;
 }
 
-class _TaraChatView extends StatefulWidget {
-  const _TaraChatView({required this.onCrisis});
+class _TaraChatBody extends StatefulWidget {
+  const _TaraChatBody({required this.onCrisis});
 
   /// (matchedPhrase, lastUserText) — raise the crisis escalation.
   final void Function(String? phrase, String lastUserText) onCrisis;
 
   @override
-  State<_TaraChatView> createState() => _TaraChatViewState();
+  State<_TaraChatBody> createState() => _TaraChatBodyState();
 }
 
-class _TaraChatViewState extends State<_TaraChatView> {
+class _TaraChatBodyState extends State<_TaraChatBody> {
   static const _langPrefsKey = 'manofit_tara_chat_lang';
 
   final _input = TextEditingController();
@@ -539,6 +469,27 @@ class _TaraChatViewState extends State<_TaraChatView> {
     });
   }
 
+  /// POSTs the conversation, retrying once — the relay host may have been
+  /// asleep and the first hit just woke it.
+  Future<http.Response?> _postChat(String payload) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final res = await http
+            .post(
+              Uri.parse('${TaraConfig.url}/chat'),
+              headers: const {'Content-Type': 'application/json'},
+              body: payload,
+            )
+            .timeout(const Duration(seconds: 75));
+        if (res.statusCode == 200) return res;
+      } catch (_) {
+        // fall through to the retry
+      }
+      if (attempt == 0) await Future.delayed(const Duration(seconds: 2));
+    }
+    return null;
+  }
+
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty || _sending) return;
@@ -549,46 +500,41 @@ class _TaraChatViewState extends State<_TaraChatView> {
     });
     _toBottom();
 
-    try {
-      final res = await http
-          .post(
-            Uri.parse('${TaraConfig.url}/chat'),
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'lang': _lang,
-              'messages': _messages
-                  .map((m) => {'role': m.role, 'text': m.text})
-                  .toList(),
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
+    final payload = jsonEncode({
+      'lang': _lang,
+      'messages':
+          _messages.map((m) => {'role': m.role, 'text': m.text}).toList(),
+    });
 
-      if (res.statusCode == 200) {
+    final res = await _postChat(payload);
+    if (!mounted) return;
+
+    if (res != null) {
+      try {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final reply = (data['reply'] as String?)?.trim();
-        if (mounted) {
-          setState(() => _messages.add(_ChatMsg(
-              'assistant', reply?.isNotEmpty == true ? reply! : "I'm here.")));
-        }
+        setState(() => _messages.add(_ChatMsg(
+            'assistant', reply?.isNotEmpty == true ? reply! : "I'm here.")));
         if (data['crisis'] == true) {
           widget.onCrisis(data['phrase'] as String?, text);
         }
-      } else {
+      } catch (_) {
         _addError();
       }
-    } catch (_) {
+    } else {
       _addError();
-    } finally {
-      if (mounted) setState(() => _sending = false);
-      _toBottom();
     }
+
+    setState(() => _sending = false);
+    _toBottom();
   }
 
   void _addError() {
     if (!mounted) return;
-    setState(() => _messages.add(_ChatMsg('assistant',
-        "I couldn't reach the service just now. Make sure the Tara server is "
-        "running, then try again.")));
+    setState(() => _messages.add(_ChatMsg(
+        'assistant',
+        "Sorry — I'm taking a moment to come online. Give it a few seconds "
+        "and send that again.")));
   }
 
   @override
@@ -661,8 +607,7 @@ class _TaraChatViewState extends State<_TaraChatView> {
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(),
-                  style:
-                      const TextStyle(color: Colors.white, fontSize: 13.5),
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
                   decoration: InputDecoration(
                     hintText: 'Message Tara…',
                     hintStyle: const TextStyle(color: Color(0xFF6F8F84)),

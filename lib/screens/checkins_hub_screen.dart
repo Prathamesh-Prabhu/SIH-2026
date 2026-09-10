@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../core/navigation.dart';
 import '../core/theme/app_theme.dart';
 import '../data/assessment_cadence.dart';
+import '../data/assessment_questions.dart';
 import '../services/db_service.dart';
 
 /// Personnel check-ins hub — daily / weekly / monthly.
@@ -73,60 +74,95 @@ class _CheckInsHubScreenState extends State<CheckInsHubScreen> {
   Widget _cadenceCard(CheckInCadence c) {
     final last = _db.lastCheckInAt(c.id);
     final due = _db.isCheckInDue(c.id, c.interval);
-    final statusLabel = due ? (last == null ? 'Not started' : 'Due now') : cadenceDueLabel(c, last);
-    final statusColor = due ? const Color(0xFFB26A00) : AppColors.secondary;
+    final statusLabel =
+        due ? (last == null ? 'Not started' : 'Due now') : cadenceDueLabel(c, last);
+    final count = questionsForCadence(c).length;
+    final accent = c.accent;
 
     return Material(
       color: AppColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         onTap: () => context.push('/wellbeing?cadence=${c.id}'),
         child: Container(
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: due ? const Color(0xFFF0D9B4) : AppColors.hairline,
-            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.hairline),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(c.icon, size: 21, color: AppColors.onSecondaryContainer),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                child: Row(
                   children: [
-                    Text(c.title,
-                        style: const TextStyle(
-                            fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                    const SizedBox(height: 2),
-                    Text('${c.blurb} · ${c.items.length} questions',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5, color: AppColors.onSurfaceVariant)),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: accent.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(c.icon, size: 22, color: accent),
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(c.title,
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary)),
+                          const SizedBox(height: 2),
+                          Text(c.blurb,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right,
+                        size: 20, color: AppColors.onSurfaceVariant),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(statusLabel,
-                      style: TextStyle(
-                          fontSize: 11.5, fontWeight: FontWeight.w700, color: statusColor)),
-                  const SizedBox(height: 2),
-                  const Icon(Icons.chevron_right, size: 18, color: AppColors.onSurfaceVariant),
-                ],
+              Container(height: 1, color: AppColors.hairline),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.help_outline_rounded,
+                        size: 14, color: AppColors.onSurfaceVariant),
+                    const SizedBox(width: 5),
+                    Text('$count questions',
+                        style: const TextStyle(
+                            fontSize: 11.5, color: AppColors.onSurfaceVariant)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: due
+                            ? const Color(0xFFB26A00).withOpacity(0.12)
+                            : AppColors.secondaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(statusLabel,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: due
+                                  ? const Color(0xFF8A5200)
+                                  : AppColors.onSecondaryContainer)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
